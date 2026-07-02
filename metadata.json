@@ -1,0 +1,6 @@
+{
+  "name": "Pizza Hunter - Multiplayer Pizzeria",
+  "description": "Dodge pizzeria tables and collect delicious pizzas in this real-time multiplayer 3D pizza-collecting game.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

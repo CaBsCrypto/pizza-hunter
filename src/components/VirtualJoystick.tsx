@@ -43,7 +43,7 @@ export function VirtualJoystick() {
   }, []);
 
   const player = playerId && gameState ? gameState.players[playerId] : null;
-  const isPlaying = player && player.state === 'alive' && !gameState.isRoundOver;
+  const isPlaying = !!(player && player.state === 'alive' && gameState && !gameState.isRoundOver);
 
   if (!isTouchDevice || !isPlaying) return null;
 

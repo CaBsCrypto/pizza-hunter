@@ -1,4 +1,13 @@
+/* PizzaVerse shared theme — Layer 1 (base) + Layer 2 (PizzaDAO 2026 season) */
+@import "../../pizzaverse-theme.css";
 @import "tailwindcss";
+
+/* Layer 3: Slice Hunter per-game accent */
+:root {
+  --pv-game-accent:      #F4A261;
+  --pv-game-accent-glow: rgba(244, 162, 97, 0.4);
+  --pv-game-accent-dark: #92400e;
+}
 
 html, body, #root {
   width: 100%;

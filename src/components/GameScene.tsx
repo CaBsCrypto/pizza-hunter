@@ -13,6 +13,10 @@ import * as THREE from 'three';
 const localCollectedOrbs = new Set<string>();
 const tablesList = getTables();
 
+export const spawnExplosion = (x: number, y: number, color: string, count: number, speed: number) => {
+  window.dispatchEvent(new CustomEvent('spawn_explosion', { detail: { x, y, color, count, speed } }));
+};
+
 function shadeColor(color: string, percent: number): string {
   let R = parseInt(color.substring(1, 3), 16);
   let G = parseInt(color.substring(3, 5), 16);
@@ -149,9 +153,18 @@ export function ChefModel({ color }: { color: string }) {
         <cylinderGeometry args={[0.09, 0.09, 0.03, 16]} />
         <meshStandardMaterial 
           color="#ffffff" 
-          emissive="#ffeaa7" 
-          emissiveIntensity={5.0} 
+          emissive="#ffffff" 
+          emissiveIntensity={8.0} 
           roughness={0.1}
+        />
+        <spotLight 
+          position={[0, 0.2, 0]} 
+          angle={0.8} 
+          penumbra={0.3} 
+          intensity={12.0} 
+          distance={35} 
+          castShadow 
+          color="#ffffff" 
         />
       </mesh>
 
@@ -748,6 +761,86 @@ function MovingObstacle({ config }: { config: MovingObstacleConfig }) {
   );
 }
 
+function ParticleSystem() {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const particles = useRef<{x: number, y: number, z: number, vx: number, vy: number, vz: number, life: number, decay: number, color: THREE.Color}[]>([]);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  
+  const geometry = useMemo(() => new THREE.BoxGeometry(0.15, 0.15, 0.15), []);
+  const material = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true }), []);
+  const colorObj = useMemo(() => new THREE.Color(), []);
+
+  useEffect(() => {
+    const handleExplosion = (e: Event) => {
+      const { x, y, color, count, speed } = (e as CustomEvent).detail;
+      const baseColor = new THREE.Color(color);
+      for (let i = 0; i < count; i++) {
+        if (particles.current.length > 500) break; // Hard cap
+        const angle = Math.random() * Math.PI * 2;
+        const zAngle = (Math.random() - 0.5) * Math.PI;
+        const spd = speed * (0.5 + Math.random() * 0.5);
+        particles.current.push({
+          x, y, z: 0.5 + Math.random() * 0.5,
+          vx: Math.cos(angle) * Math.cos(zAngle) * spd,
+          vy: Math.sin(angle) * Math.cos(zAngle) * spd,
+          vz: Math.sin(zAngle) * spd + 2.0, // base upward velocity
+          life: 1.0,
+          decay: 1.0 + Math.random() * 2.0,
+          color: baseColor.clone().lerp(new THREE.Color('#ffffff'), Math.random() * 0.3)
+        });
+      }
+    };
+    window.addEventListener('spawn_explosion', handleExplosion);
+    return () => window.removeEventListener('spawn_explosion', handleExplosion);
+  }, []);
+
+  useFrame((state, delta) => {
+    if (!meshRef.current) return;
+    let activeCount = 0;
+    const time = state.clock.getElapsedTime();
+    
+    for (let i = 0; i < particles.current.length; i++) {
+      const p = particles.current[i];
+      p.life -= p.decay * delta;
+      if (p.life > 0) {
+        p.vz -= 9.8 * delta; // gravity
+        p.x += p.vx * delta;
+        p.y += p.vy * delta;
+        p.z += p.vz * delta;
+        
+        if (p.z < 0.1) {
+          p.z = 0.1;
+          p.vz *= -0.5; // bounce
+          p.vx *= 0.8; // friction
+          p.vy *= 0.8;
+        }
+
+        dummy.position.set(p.x, p.y, p.z);
+        const scale = p.life;
+        dummy.scale.set(scale, scale, scale);
+        dummy.rotation.set(time * 10 + i, time * 12 + i, 0);
+        dummy.updateMatrix();
+        
+        meshRef.current.setMatrixAt(activeCount, dummy.matrix);
+        meshRef.current.setColorAt(activeCount, p.color);
+        
+        if (activeCount !== i) {
+          particles.current[activeCount] = p;
+        }
+        activeCount++;
+      }
+    }
+    particles.current.length = activeCount;
+    meshRef.current.count = activeCount;
+    meshRef.current.instanceMatrix.needsUpdate = true;
+    if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={meshRef} args={[geometry, material, 500]} frustumCulled={false} />
+  );
+}
+
 function PizzeriaWalls() {
   const wallThickness = 2;
   const wallHeight = 4;
@@ -846,15 +939,8 @@ function Snake({ playerId, color, isLocal, boxTexture }: { playerId: string, col
     }
     
     headRef.current.visible = true;
-    const isInvincible = player.invincibleUntil ? Date.now() < player.invincibleUntil : false;
-    if (isInvincible) {
-      const flash = Math.floor(Date.now() / 150) % 2 === 0;
-      headRef.current.visible = flash;
-      bodyRef.current.visible = flash;
-    } else {
-      headRef.current.visible = true;
-      bodyRef.current.visible = true;
-    }
+    headRef.current.visible = true;
+    bodyRef.current.visible = true;
 
     // Animate shield bubble
     const hasShield = !!player.hasShield;
@@ -1036,6 +1122,7 @@ function Snake({ playerId, color, isLocal, boxTexture }: { playerId: string, col
 function Projectiles({ pizzaTexture }: { pizzaTexture: THREE.CanvasTexture }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const previousProjectiles = useRef<Record<string, {x: number, y: number, life: number}>>({});
 
   const pizzaGeometry = useMemo(() => {
     // A smaller, thinner pizza slice or whole pizza that flies
@@ -1072,8 +1159,22 @@ function Projectiles({ pizzaTexture }: { pizzaTexture: THREE.CanvasTexture }) {
     const time = state.clock.getElapsedTime();
     let idx = 0;
 
+    const currentProjIds = new Set(Object.keys(gs.projectiles));
+    for (const oldId in previousProjectiles.current) {
+      if (!currentProjIds.has(oldId)) {
+        const oldP = previousProjectiles.current[oldId];
+        if (oldP.life > 0.05) { // Didn't just expire, it hit something
+          spawnExplosion(oldP.x, oldP.y, '#e84118', 15, 6);
+        }
+      }
+    }
+    
+    previousProjectiles.current = {};
+
     for (const projId in gs.projectiles) {
       const proj = gs.projectiles[projId];
+      previousProjectiles.current[projId] = { x: proj.x, y: proj.y, life: proj.life };
+
       if (idx >= 300) break; // cap at 300 projectiles on screen
 
       dummy.position.set(proj.x, proj.y, 0.3);
@@ -1209,8 +1310,6 @@ export function GameScene() {
   const lightRef = useRef<THREE.DirectionalLight>(null);
   const [lightTarget] = useState(() => new THREE.Object3D());
   const cameraTarget = useRef({ x: 0, y: 0, z: 30 });
-  const shakeIntensity = useRef(0);
-  const lastShakeOffset = useRef({ x: 0, y: 0, z: 0 });
 
   const localPlayerRef = useRef<{
     active: boolean;
@@ -1808,9 +1907,6 @@ export function GameScene() {
 
     // Play local shoot sound immediately
     playPizzaShootSound();
-
-    // Trigger local screen shake
-    shakeIntensity.current = 0.45;
   };
 
   const consumeShield = () => {
@@ -1831,9 +1927,6 @@ export function GameScene() {
     setTimeout(() => {
       playPizzaCollectSound();
     }, 100);
-
-    // Screen shake
-    shakeIntensity.current = 0.55;
     
     // Send state to server
     sendPlayerState({
@@ -2162,10 +2255,10 @@ export function GameScene() {
             localPlayerRef.current.hasShield = false;
             localPlayerRef.current.invincibleUntil = Date.now() + 1800; // 1.8 seconds invincibility frame
             playShieldPopSound();
-            shakeIntensity.current = 0.6; // Soft shake
+            spawnExplosion(head.x, head.y, '#00f0ff', 25, 4);
           } else {
             playCrashSound();
-            shakeIntensity.current = 2.0; // Trigger screen shake!
+            spawnExplosion(head.x, head.y, '#ffb090', 40, 8);
             localPlayerRef.current.active = false;
             sendPlayerState({
               segments: localPlayerRef.current.segments,
@@ -2209,12 +2302,6 @@ export function GameScene() {
       localPlayerRef.current.active = false;
     }
 
-    // --- GLOBAL CAMERA AND SHAKE UPDATE ---
-    // Subtract previous shake offset to restore base camera position
-    camera.position.x -= lastShakeOffset.current.x;
-    camera.position.y -= lastShakeOffset.current.y;
-    camera.position.z -= lastShakeOffset.current.z;
-
     // Smoothly move the base camera position toward target
     const lerpSpeedX = 10 * delta;
     const lerpSpeedY = 10 * delta;
@@ -2223,41 +2310,13 @@ export function GameScene() {
     camera.position.y += (cameraTarget.current.y - camera.position.y) * lerpSpeedY;
     camera.position.z += (cameraTarget.current.z - camera.position.z) * lerpSpeedZ;
 
-    // Process screen shake
-    let shakeX = 0;
-    let shakeY = 0;
-    let shakeZ = 0;
-
-    if (shakeIntensity.current > 0.01) {
-      const currentIntensity = shakeIntensity.current;
-      shakeX = (Math.random() - 0.5) * 2.0 * currentIntensity;
-      shakeY = (Math.random() - 0.5) * 2.0 * currentIntensity;
-      shakeZ = (Math.random() - 0.5) * 0.8 * currentIntensity;
-
-      // Decay intensity over time
-      shakeIntensity.current -= delta * 5.0; // Decay fully over 0.4 seconds
-      if (shakeIntensity.current < 0) shakeIntensity.current = 0;
-    } else {
-      shakeIntensity.current = 0;
-    }
-
-    // Apply the new shake offset
-    camera.position.x += shakeX;
-    camera.position.y += shakeY;
-    camera.position.z += shakeZ;
-
-    // Save the new shake offset so we can subtract it in the next frame
-    lastShakeOffset.current.x = shakeX;
-    lastShakeOffset.current.y = shakeY;
-    lastShakeOffset.current.z = shakeZ;
-
     // Always look at the un-shaken camera position
-    camera.lookAt(camera.position.x - shakeX, camera.position.y - shakeY, 0);
+    camera.lookAt(camera.position.x, camera.position.y, 0);
 
     // Make the directional light follow the camera to keep shadows crisp
     if (lightRef.current) {
-      lightRef.current.position.set(camera.position.x - shakeX + 10, camera.position.y - shakeY - 10, 30);
-      lightTarget.position.set(camera.position.x - shakeX, camera.position.y - shakeY, 0);
+      lightRef.current.position.set(camera.position.x + 10, camera.position.y - 10, 30);
+      lightTarget.position.set(camera.position.x, camera.position.y, 0);
     }
   });
 
@@ -2293,6 +2352,9 @@ export function GameScene() {
       {/* Cozy Pizzeria Brick/Wood Boundaries */}
       <PizzeriaWalls />
 
+      {/* Particles System */}
+      <ParticleSystem />
+      
       {/* 3D Pizzeria Tables */}
       <InstancedTables clothTexture={clothTexture} />
 

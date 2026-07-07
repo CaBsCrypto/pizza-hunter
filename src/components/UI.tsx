@@ -199,8 +199,8 @@ export function UI() {
         lastA = pressedA;
 
         // D-Pad Left (button 14) / Right (button 15) or Left stick to toggle Solo/Multiplayer
-        const dpadLeft = gp.buttons[14]?.pressed || gp.axes[0] < -0.5 || false;
-        const dpadRight = gp.buttons[15]?.pressed || gp.axes[0] > 0.5 || false;
+        const dpadLeft = gp.buttons[14]?.pressed || (gp.axes && gp.axes[0] !== undefined && gp.axes[0] < -0.5) || false;
+        const dpadRight = gp.buttons[15]?.pressed || (gp.axes && gp.axes[0] !== undefined && gp.axes[0] > 0.5) || false;
 
         if (dpadLeft && !lastDPadLeft) {
           setSelectedSolo(true);

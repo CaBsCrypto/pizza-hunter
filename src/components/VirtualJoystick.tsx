@@ -27,8 +27,8 @@ export function VirtualJoystick() {
   const { gameState, playerId } = useGameStore();
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const joystickRef = useRef<HTMLDivElement>(null);
-  const [joystickActive, setJoystickActive] = useState(false);
-  const [stickPos, setStickPos] = useState({ x: 0, y: 0 });
+  const stickRef = useRef<HTMLDivElement>(null);
+  const joystickActive = useRef(false);
   const touchStartPos = useRef({ x: 0, y: 0 });
   const maxRadius = 50; // px
 
@@ -55,12 +55,12 @@ export function VirtualJoystick() {
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
       touchStartPos.current = { x: centerX, y: centerY };
-      setJoystickActive(true);
+      joystickActive.current = true;
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!joystickActive) return;
+    if (!joystickActive.current) return;
     const touch = e.touches[0];
     const dx = touch.clientX - touchStartPos.current.x;
     const dy = touch.clientY - touchStartPos.current.y;
@@ -75,7 +75,9 @@ export function VirtualJoystick() {
       ry = Math.sin(angle) * maxRadius;
     }
 
-    setStickPos({ x: rx, y: ry });
+    if (stickRef.current) {
+      stickRef.current.style.transform = `translate(${rx}px, ${ry}px)`;
+    }
 
     const turnVal = rx / maxRadius; // Range -1 to 1
     if (window.virtualInputs) {
@@ -84,8 +86,10 @@ export function VirtualJoystick() {
   };
 
   const handleTouchEnd = () => {
-    setJoystickActive(false);
-    setStickPos({ x: 0, y: 0 });
+    joystickActive.current = false;
+    if (stickRef.current) {
+      stickRef.current.style.transform = `translate(0px, 0px)`;
+    }
     if (window.virtualInputs) {
       window.virtualInputs.analogTurn = 0;
     }
@@ -100,14 +104,16 @@ export function VirtualJoystick() {
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
           className="w-32 h-32 rounded-full bg-black/45 border-2 border-white/20 flex items-center justify-center relative touch-none backdrop-blur-sm"
         >
           <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 absolute" />
           
           <div
+            ref={stickRef}
             className="w-16 h-16 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 border border-white/30 absolute shadow-xl shadow-amber-500/20 active:from-amber-400 active:to-amber-500 transition-shadow duration-150 flex items-center justify-center"
             style={{
-              transform: `translate(${stickPos.x}px, ${stickPos.y}px)`,
+              transform: `translate(0px, 0px)`,
             }}
           >
             <div className="w-6 h-6 rounded-full bg-white/20" />
@@ -119,8 +125,12 @@ export function VirtualJoystick() {
       <div className="absolute bottom-8 right-8 flex flex-col gap-4 items-end pointer-events-auto">
         {player.hasShield && (
           <button
-            onTouchStart={() => {
+            onTouchStart={(e) => {
+              e.preventDefault(); // Evita comportamientos nativos
               if (window.virtualInputs) window.virtualInputs.consume = true;
+            }}
+            onTouchCancel={() => {
+              if (window.virtualInputs) window.virtualInputs.consume = false;
             }}
             className="w-14 h-14 rounded-full bg-emerald-500/90 border border-emerald-400/40 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform touch-none backdrop-blur-sm"
           >
@@ -131,10 +141,14 @@ export function VirtualJoystick() {
         <div className="flex gap-4">
           {/* Turbo / Boost Button */}
           <button
-            onTouchStart={() => {
+            onTouchStart={(e) => {
+              e.preventDefault();
               if (window.virtualInputs) window.virtualInputs.boost = true;
             }}
             onTouchEnd={() => {
+              if (window.virtualInputs) window.virtualInputs.boost = false;
+            }}
+            onTouchCancel={() => {
               if (window.virtualInputs) window.virtualInputs.boost = false;
             }}
             className="w-16 h-16 rounded-full bg-gradient-to-r from-red-600 to-red-500 border border-white/20 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform touch-none backdrop-blur-sm"
@@ -144,10 +158,14 @@ export function VirtualJoystick() {
 
           {/* Shoot Button */}
           <button
-            onTouchStart={() => {
+            onTouchStart={(e) => {
+              e.preventDefault();
               if (window.virtualInputs) window.virtualInputs.shoot = true;
             }}
             onTouchEnd={() => {
+              if (window.virtualInputs) window.virtualInputs.shoot = false;
+            }}
+            onTouchCancel={() => {
               if (window.virtualInputs) window.virtualInputs.shoot = false;
             }}
             className="w-20 h-20 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 border border-white/30 text-neutral-950 flex flex-col items-center justify-center shadow-2xl active:scale-95 transition-transform touch-none backdrop-blur-sm"

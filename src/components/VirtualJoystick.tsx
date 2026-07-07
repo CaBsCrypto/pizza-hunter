@@ -51,10 +51,12 @@ export function VirtualJoystick() {
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     const touch = e.touches[0];
     if (joystickRef.current) {
-      const rect = joystickRef.current.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      touchStartPos.current = { x: centerX, y: centerY };
+      // Anclar la base al lugar del toque
+      joystickRef.current.style.left = `${touch.clientX}px`;
+      joystickRef.current.style.top = `${touch.clientY}px`;
+      joystickRef.current.style.opacity = '1';
+      
+      touchStartPos.current = { x: touch.clientX, y: touch.clientY };
       joystickActive.current = true;
     }
   };
@@ -90,6 +92,9 @@ export function VirtualJoystick() {
     if (stickRef.current) {
       stickRef.current.style.transform = `translate(0px, 0px)`;
     }
+    if (joystickRef.current) {
+      joystickRef.current.style.opacity = '0';
+    }
     if (window.virtualInputs) {
       window.virtualInputs.analogTurn = 0;
     }
@@ -97,15 +102,17 @@ export function VirtualJoystick() {
 
   return (
     <div className="absolute inset-0 pointer-events-none z-50 flex select-none">
-      {/* Joystick Zone (Left) */}
-      <div className="absolute bottom-8 left-8 w-40 h-40 flex items-center justify-center pointer-events-auto">
+      {/* Joystick Zone (Left Half of Screen) */}
+      <div 
+        className="absolute inset-y-0 left-0 w-1/2 pointer-events-auto touch-none"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+      >
         <div
           ref={joystickRef}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onTouchCancel={handleTouchEnd}
-          className="w-32 h-32 rounded-full bg-black/45 border-2 border-white/20 flex items-center justify-center relative touch-none backdrop-blur-sm"
+          className="absolute w-32 h-32 -ml-16 -mt-16 rounded-full bg-black/45 border-2 border-white/20 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-150 backdrop-blur-sm"
         >
           <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 absolute" />
           

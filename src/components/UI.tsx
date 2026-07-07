@@ -472,7 +472,7 @@ export function UI() {
                 className="bg-neutral-900/95 border border-white/10 rounded-3xl shadow-2xl max-w-4xl w-full grid grid-cols-1 md:grid-cols-12 gap-6 p-6 md:p-8 relative overflow-hidden"
               >
                 {/* LEFT COLUMN: 3D character card */}
-                <div className="md:col-span-5 flex flex-col gap-4">
+                <div className="md:col-span-5 flex flex-col gap-4 order-2 md:order-1">
                   <div className="bg-black/30 border border-white/5 rounded-2xl p-4 flex flex-col gap-4">
                     <div className="flex items-center gap-2">
                       <div className="bg-amber-500/20 text-amber-400 p-1.5 rounded-lg">
@@ -522,7 +522,7 @@ export function UI() {
                 </div>
 
                 {/* RIGHT COLUMN: lobby room information */}
-                <div className="md:col-span-7 flex flex-col justify-between gap-6">
+                <div className="md:col-span-7 flex flex-col justify-between gap-6 order-1 md:order-2">
                   <div>
                     <div className="flex items-center gap-2 mb-1.5 justify-center md:justify-start">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
@@ -782,7 +782,7 @@ export function UI() {
                 className="bg-neutral-900/95 border border-white/10 rounded-3xl shadow-2xl max-w-4xl w-full grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 p-4 md:p-8 overflow-y-auto max-h-[92vh] md:max-h-none"
               >
                 {/* LEFT PANEL: Character Showcase & Customization (Clash Royale Style Card) */}
-                <div className="md:col-span-5 flex flex-col gap-4">
+                <div className="md:col-span-5 flex flex-col gap-4 order-2 md:order-1">
                   <div className="bg-black/30 border border-white/5 rounded-2xl p-4 flex flex-col gap-4 relative overflow-hidden group">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -878,7 +878,7 @@ export function UI() {
                 </div>
 
                 {/* RIGHT PANEL: Battle Matchmaking Config */}
-                <div className="md:col-span-7 flex flex-col justify-between gap-6">
+                <div className="md:col-span-7 flex flex-col justify-between gap-6 order-1 md:order-2">
                   <div className="flex flex-col gap-4">
                     {/* Header */}
                     <div>

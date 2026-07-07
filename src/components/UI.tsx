@@ -923,119 +923,19 @@ export function UI() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setSelectedSolo(false)}
-                          className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold font-mono transition-all ${
-                            !selectedSolo
-                              ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/10'
-                              : 'text-white/60 hover:text-white hover:bg-white/5'
-                          }`}
+                          disabled
+                          className="relative flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold font-mono text-white/30 bg-black/20 overflow-hidden cursor-not-allowed"
                         >
                           <Users size={14} />
                           <span>MULTIJUGADOR</span>
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+                            <span className="text-[9px] bg-red-600/90 text-white px-2 py-0.5 rounded font-black tracking-widest border border-red-500/50 shadow-lg rotate-[-5deg]">PRÓXIMAMENTE</span>
+                          </div>
                         </button>
                       </div>
                     </div>
 
-                    {/* Dynamic panel per selected mode */}
-                    <AnimatePresence mode="wait">
-                      {selectedSolo ? (
-                        <motion.div
-                          key="solo-panel"
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -5 }}
-                          transition={{ duration: 0.15 }}
-                          className="bg-black/25 p-3 rounded-2xl border border-white/5 flex flex-col gap-1.5 text-xs text-white/70"
-                        >
-                          <div className="flex items-center gap-2 text-amber-400 font-bold mb-0.5">
-                            <Sparkles size={14} />
-                            <span className="font-mono uppercase tracking-wider text-[10px]">Modo de Práctica Instantáneo</span>
-                          </div>
-                          <p>• Juega inmediatamente sin retrasos ni colas de red.</p>
-                          <p>• Compite contra 4 oponentes controlados por IA.</p>
-                          <p>• ¡Perfecto para dominar las físicas y el disparo de pizzas!</p>
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="multiplayer-panel"
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -5 }}
-                          transition={{ duration: 0.15 }}
-                          className="flex flex-col gap-3.5 p-3.5 bg-black/25 rounded-2xl border border-white/5"
-                        >
-                          {/* Room size selector */}
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-white/40 text-[10px] font-mono uppercase tracking-wider">Capacidad de la Sala</label>
-                            <div className="grid grid-cols-3 gap-1.5">
-                              {[2, 3, 4].map((size) => (
-                                <button
-                                  key={size}
-                                  type="button"
-                                  onClick={() => setSelectedSize(size)}
-                                  className={`py-1.5 rounded-lg text-xs font-mono font-extrabold transition-all border ${
-                                    selectedSize === size
-                                      ? 'bg-white/10 text-white border-amber-500/40'
-                                      : 'bg-transparent text-white/50 border-white/5 hover:border-white/10 hover:text-white'
-                                  }`}
-                                >
-                                  {size} Chefs
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Privacy toggles */}
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-white/40 text-[10px] font-mono uppercase tracking-wider">Tipo de Conexión</label>
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedPrivate(false)}
-                                className={`py-1.5 rounded-lg text-xs font-mono font-semibold transition-all border ${
-                                  !selectedPrivate
-                                    ? 'bg-white/10 text-white border-amber-500/40'
-                                    : 'bg-transparent text-white/50 border-white/5 hover:border-white/10 hover:text-white'
-                                }`}
-                              >
-                                Pública (Rápida)
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedPrivate(true)}
-                                className={`py-1.5 rounded-lg text-xs font-mono font-semibold transition-all border ${
-                                  selectedPrivate
-                                    ? 'bg-white/10 text-white border-amber-500/40'
-                                    : 'bg-transparent text-white/50 border-white/5 hover:border-white/10 hover:text-white'
-                                }`}
-                              >
-                                Privada (Código)
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Room code input if private */}
-                          {selectedPrivate && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: 'auto' }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="flex flex-col gap-1.5"
-                            >
-                              <label className="text-white/40 text-[10px] font-mono uppercase tracking-wider">Código de Sala Privada</label>
-                              <input
-                                type="text"
-                                value={inputCode}
-                                onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-                                placeholder="EJ: AMIGOS"
-                                maxLength={8}
-                                className="w-full px-3 py-2 bg-black/60 border border-white/10 rounded-lg text-white font-mono text-center font-bold tracking-widest text-sm focus:outline-none focus:border-amber-500"
-                              />
-                            </motion.div>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    {/* Configuración compactada (Paneles eliminados) */}
                   </div>
 
                   {/* Battle CTA Actions */}

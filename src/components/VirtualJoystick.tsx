@@ -30,6 +30,7 @@ export function VirtualJoystick() {
   const stickRef = useRef<HTMLDivElement>(null);
   const joystickActive = useRef(false);
   const touchStartPos = useRef({ x: 0, y: 0 });
+  const joystickTouchId = useRef<number | null>(null);
   const maxRadius = 50; // px
 
   useEffect(() => {
@@ -49,23 +50,39 @@ export function VirtualJoystick() {
 
   // Joystick touch handlers
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    const touch = e.touches[0];
-    if (joystickRef.current) {
-      // Anclar la base al lugar del toque
-      joystickRef.current.style.left = `${touch.clientX}px`;
-      joystickRef.current.style.top = `${touch.clientY}px`;
-      joystickRef.current.style.opacity = '1';
+    if (joystickTouchId.current !== null) return;
+    
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const touch = e.changedTouches[i];
+      joystickTouchId.current = touch.identifier;
       
-      touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-      joystickActive.current = true;
+      if (joystickRef.current) {
+        // Anclar la base al lugar del toque
+        joystickRef.current.style.left = `${touch.clientX}px`;
+        joystickRef.current.style.top = `${touch.clientY}px`;
+        joystickRef.current.style.opacity = '1';
+        
+        touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+        joystickActive.current = true;
+      }
+      break;
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!joystickActive.current) return;
-    const touch = e.touches[0];
-    const dx = touch.clientX - touchStartPos.current.x;
-    const dy = touch.clientY - touchStartPos.current.y;
+    if (!joystickActive.current || joystickTouchId.current === null) return;
+    
+    let activeTouch = null;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === joystickTouchId.current) {
+        activeTouch = e.changedTouches[i];
+        break;
+      }
+    }
+    if (!activeTouch) return;
+
+    const dx = activeTouch.clientX - touchStartPos.current.x;
+    const dy = activeTouch.clientY - touchStartPos.current.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     let angle = Math.atan2(dy, dx);
@@ -87,7 +104,20 @@ export function VirtualJoystick() {
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (joystickTouchId.current === null) return;
+
+    let ended = false;
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === joystickTouchId.current) {
+        ended = true;
+        break;
+      }
+    }
+    
+    if (!ended) return;
+
+    joystickTouchId.current = null;
     joystickActive.current = false;
     if (stickRef.current) {
       stickRef.current.style.transform = `translate(0px, 0px)`;
@@ -102,9 +132,9 @@ export function VirtualJoystick() {
 
   return (
     <div className="absolute inset-0 pointer-events-none z-50 flex select-none">
-      {/* Joystick Zone (Left Half of Screen) */}
+      {/* Joystick Zone (Full Screen) */}
       <div 
-        className="absolute inset-y-0 left-0 w-1/2 pointer-events-auto touch-none"
+        className="absolute inset-0 pointer-events-auto touch-none"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

@@ -31,7 +31,7 @@ export function VirtualJoystick() {
   const joystickActive = useRef(false);
   const touchStartPos = useRef({ x: 0, y: 0 });
   const joystickTouchId = useRef<number | null>(null);
-  const maxRadius = 50; // px
+  const maxRadius = 70; // px — larger radius = more precision, less accidental max-turn
 
   useEffect(() => {
     const checkTouch = () => {
@@ -99,7 +99,9 @@ export function VirtualJoystick() {
       stickRef.current.style.transform = `translate(${rx}px, ${ry}px)`;
     }
 
-    const turnVal = rx / maxRadius; // Range -1 to 1
+    // Quadratic curve: small movements = gentle turn, large movements = sharp turn
+    const rawTurn = rx / maxRadius; // -1 to 1
+    const turnVal = Math.sign(rawTurn) * rawTurn * rawTurn; // quadratic response
     if (window.virtualInputs) {
       window.virtualInputs.analogTurn = turnVal;
     }
@@ -133,9 +135,9 @@ export function VirtualJoystick() {
 
   return (
     <div className="absolute inset-0 pointer-events-none z-50 flex select-none">
-      {/* Joystick Zone (Right Half of Screen) */}
+      {/* Joystick Zone (Full Screen — multi-touch tracks finger ID) */}
       <div 
-        className="absolute inset-y-0 right-0 w-1/2 pointer-events-auto touch-none"
+        className="absolute inset-0 pointer-events-auto touch-none"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

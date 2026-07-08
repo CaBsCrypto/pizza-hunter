@@ -50,6 +50,7 @@ export function VirtualJoystick() {
 
   // Joystick touch handlers
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    e.preventDefault(); // Bloquea pointerdown simulado → evita disparo involuntario
     if (joystickTouchId.current !== null) return;
     
     for (let i = 0; i < e.changedTouches.length; i++) {
@@ -132,9 +133,9 @@ export function VirtualJoystick() {
 
   return (
     <div className="absolute inset-0 pointer-events-none z-50 flex select-none">
-      {/* Joystick Zone (Full Screen) */}
+      {/* Joystick Zone (Right Half of Screen) */}
       <div 
-        className="absolute inset-0 pointer-events-auto touch-none"
+        className="absolute inset-y-0 right-0 w-1/2 pointer-events-auto touch-none"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -158,8 +159,8 @@ export function VirtualJoystick() {
         </div>
       </div>
 
-      {/* Action Buttons Zone (Right) */}
-      <div className="absolute bottom-8 right-8 flex flex-col gap-4 items-end pointer-events-auto">
+      {/* Action Buttons Zone (Left) */}
+      <div className="absolute bottom-16 left-8 flex flex-col gap-4 items-start pointer-events-auto">
         {player.hasShield && (
           <button
             onTouchStart={(e) => {

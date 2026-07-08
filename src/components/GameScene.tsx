@@ -2040,7 +2040,8 @@ export function GameScene() {
         // Snap camera base target immediately on spawn
         cameraTarget.current.x = serverPlayer.segments[0].x;
         cameraTarget.current.y = serverPlayer.segments[0].y;
-        cameraTarget.current.z = 22;
+        const aspectFactor = Math.max(1, 1.3 / camera.aspect);
+        cameraTarget.current.z = 22 * aspectFactor;
         camera.position.set(cameraTarget.current.x, cameraTarget.current.y, cameraTarget.current.z);
       }
 
@@ -2273,7 +2274,10 @@ export function GameScene() {
           // Update camera target dynamically
           cameraTarget.current.x = head.x;
           cameraTarget.current.y = head.y;
-          cameraTarget.current.z = Math.min(50, Math.max(22, 22 + localPlayerRef.current.score * 0.15));
+          const aspectFactor = Math.max(1, 1.3 / camera.aspect);
+          const baseZ = 22 * aspectFactor;
+          const maxZ = 50 * aspectFactor;
+          cameraTarget.current.z = Math.min(maxZ, Math.max(baseZ, baseZ + localPlayerRef.current.score * 0.15 * aspectFactor));
 
           // Overwrite global state for local rendering
           gs.players[playerId].segments = localPlayerRef.current.segments;

@@ -160,7 +160,7 @@ export function VirtualJoystick() {
       </div>
 
       {/* Action Buttons Zone (Left) */}
-      <div className="absolute bottom-16 left-8 flex flex-col gap-4 items-start pointer-events-auto">
+      <div className="absolute bottom-24 left-8 flex flex-col gap-4 items-start pointer-events-auto">
         {player.hasShield && (
           <button
             onTouchStart={(e) => {

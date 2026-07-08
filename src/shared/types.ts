@@ -102,7 +102,7 @@ export const ORB_SPAWN_RATE = 0.1; // Orbs per tick
 export const MAX_ORBS = 200; // Good density for pizzas
 export const INITIAL_LENGTH = 5; // Start with a smaller trail of boxes
 export const SEGMENT_SPACING = 0.8; // Pizza boxes spacing
-export const TURN_SPEED = Math.PI * 2.5; // Tighter turning radius for table dodging
+export const TURN_SPEED = Math.PI * 1.35; // Tighter turning radius for table dodging
 
 // Deterministic tables generator to keep server and client in perfect sync
 export function getTables(): TableObstacleType[] {

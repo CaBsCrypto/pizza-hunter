@@ -73,9 +73,9 @@ export function VirtualJoystick() {
     if (!joystickActive.current || joystickTouchId.current === null) return;
     
     let activeTouch = null;
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      if (e.changedTouches[i].identifier === joystickTouchId.current) {
-        activeTouch = e.changedTouches[i];
+    for (let i = 0; i < e.touches.length; i++) {
+      if (e.touches[i].identifier === joystickTouchId.current) {
+        activeTouch = e.touches[i];
         break;
       }
     }

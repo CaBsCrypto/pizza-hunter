@@ -8,6 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useGameStore, globalGameState } from '../store/gameStore';
 import { WORLD_SIZE, TURN_SPEED, BOOST_SPEED, BASE_SPEED, getTables, getMovingObstacles, MOVING_OBSTACLES_CONFIGS, MovingObstacleConfig } from '../shared/types';
 import { playPizzaCollectSound, playCrashSound, playShieldCollectSound, playShieldPopSound, playPizzaShootSound } from '../utils/audio';
+import { useGameInput } from '../hooks/useGameInput';
 import * as THREE from 'three';
 
 const localCollectedOrbs = new Set<string>();
@@ -1306,7 +1307,10 @@ function Orbs({ pizzaTexture }: { pizzaTexture: THREE.CanvasTexture }) {
 export function GameScene() {
   const { gameState, playerId, sendPlayerState, sendCollectOrb, isSolo } = useGameStore();
   const { camera } = useThree();
-  const inputs = useRef({ left: false, right: false, boost: false });
+  const { pollInputs } = useGameInput({
+    onShoot: () => firePizza(),
+    onConsumeShield: () => consumeShield(),
+  });
   const lightRef = useRef<THREE.DirectionalLight>(null);
   const [lightTarget] = useState(() => new THREE.Object3D());
   const cameraTarget = useRef({ x: 0, y: 0, z: 30 });
@@ -1940,28 +1944,6 @@ export function GameScene() {
   };
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') && !inputs.current.left) { inputs.current.left = true; }
-      if ((e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') && !inputs.current.right) { inputs.current.right = true; }
-      if ((e.key === ' ' || e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') && !inputs.current.boost) { inputs.current.boost = true; }
-
-      // Fire pizza keydown triggers
-      if (e.key === 'f' || e.key === 'F' || e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
-        firePizza();
-      }
-
-      // Eat/consume shield key triggers
-      if (e.key === 'q' || e.key === 'Q') {
-        consumeShield();
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if ((e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') && inputs.current.left) { inputs.current.left = false; }
-      if ((e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') && inputs.current.right) { inputs.current.right = false; }
-      if ((e.key === ' ' || e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') && inputs.current.boost) { inputs.current.boost = false; }
-    };
-
     const handlePointerDown = (e: PointerEvent) => {
       const target = e.target as HTMLElement;
       if (
@@ -1975,14 +1957,7 @@ export function GameScene() {
       firePizza();
     };
 
-    const handleBlur = () => {
-      inputs.current = { left: false, right: false, boost: false };
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('blur', handleBlur);
 
     // Listen to shoot_effect from server for other players
     const socket = useGameStore.getState().socket;
@@ -2007,10 +1982,7 @@ export function GameScene() {
     window.addEventListener('local_shoot_effect', handleLocalShootEffect);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('blur', handleBlur);
       window.removeEventListener('local_shoot_effect', handleLocalShootEffect);
       if (socket) {
         socket.off('shoot_effect', handleRemoteShootEffect);
@@ -2046,82 +2018,18 @@ export function GameScene() {
       }
 
       if (localPlayerRef.current.active && !gs.isRoundOver) {
-        // --- GAMEPAD / XBOX CONTROLLER POLLING ---
-        const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-        let gamepadLeft = false;
-        let gamepadRight = false;
-        let gamepadBoost = false;
-        let gamepadShoot = false;
-        let gamepadConsumeShield = false;
-        let analogTurnValue = 0;
+        // Obtener inputs unificados (teclado, gamepad y joystick) del Hook
+        const inputState = pollInputs();
 
-        for (let i = 0; i < gamepads.length; i++) {
-          const gp = gamepads[i];
-          if (gp) {
-            // Left Joystick (X axis is index 0)
-            const axisX = gp.axes[0];
-            if (axisX !== undefined && Math.abs(axisX) > 0.15) {
-              analogTurnValue = axisX;
-            }
-
-            // D-Pad Left (Button 14) and Right (Button 15)
-            if (gp.buttons[14] && gp.buttons[14].pressed) gamepadLeft = true;
-            if (gp.buttons[15] && gp.buttons[15].pressed) gamepadRight = true;
-
-            // Xbox Buttons for Boost/Sprint: A (0), Left Bumper (4), Left Trigger (6)
-            const boostBtnIndices = [0, 4, 6];
-            for (const btnIndex of boostBtnIndices) {
-              if (gp.buttons[btnIndex] && gp.buttons[btnIndex].pressed) {
-                gamepadBoost = true;
-                break;
-              }
-            }
-
-            // Xbox Buttons for Shooting: B (1), X (2), Right Bumper (5), Right Trigger (7)
-            const shootBtnIndices = [1, 2, 5, 7];
-            for (const btnIndex of shootBtnIndices) {
-              if (gp.buttons[btnIndex] && gp.buttons[btnIndex].pressed) {
-                gamepadShoot = true;
-                break;
-              }
-            }
-
-            // Xbox Buttons for Eating/Consuming Shield: Y (3), D-Pad Up (12), D-Pad Down (13)
-            const consumeBtnIndices = [3, 12, 13];
-            for (const btnIndex of consumeBtnIndices) {
-              if (gp.buttons[btnIndex] && gp.buttons[btnIndex].pressed) {
-                gamepadConsumeShield = true;
-                break;
-              }
-            }
-          }
-        }
-
-        // Fire pizza on gamepad or mobile button trigger
-        if (gamepadShoot || (window.virtualInputs && window.virtualInputs.shoot)) {
-          firePizza();
-          if (window.virtualInputs) window.virtualInputs.shoot = false;
-        }
-
-        // Consume/eat shield on gamepad or mobile button trigger
-        if (gamepadConsumeShield || (window.virtualInputs && window.virtualInputs.consume)) {
-          consumeShield();
-          if (window.virtualInputs) window.virtualInputs.consume = false;
-        }
-
-        // Local movement logic (Support analog joystick, virtual mobile joystick, or digital keyboard/d-pad turning)
-        const virtualTurn = window.virtualInputs ? window.virtualInputs.analogTurn : 0;
-        const finalAnalogTurn = analogTurnValue !== 0 ? analogTurnValue : virtualTurn;
-
-        if (finalAnalogTurn !== 0) {
-          localPlayerRef.current.currentAngle -= finalAnalogTurn * TURN_SPEED * delta;
+        // Local movement logic
+        if (inputState.analogTurn !== 0) {
+          localPlayerRef.current.currentAngle -= inputState.analogTurn * TURN_SPEED * delta;
         } else {
-          if (inputs.current.left || gamepadLeft) localPlayerRef.current.currentAngle += TURN_SPEED * delta;
-          if (inputs.current.right || gamepadRight) localPlayerRef.current.currentAngle -= TURN_SPEED * delta;
+          if (inputState.digitalLeft) localPlayerRef.current.currentAngle += TURN_SPEED * delta;
+          if (inputState.digitalRight) localPlayerRef.current.currentAngle -= TURN_SPEED * delta;
         }
         
-        const virtualBoost = window.virtualInputs ? window.virtualInputs.boost : false;
-        localPlayerRef.current.isBoosting = (inputs.current.boost || gamepadBoost || virtualBoost) && localPlayerRef.current.score > 5;
+        localPlayerRef.current.isBoosting = inputState.isBoosting && localPlayerRef.current.score > 5;
         const speed = localPlayerRef.current.isBoosting ? BOOST_SPEED : BASE_SPEED;
         
         const head = { ...localPlayerRef.current.segments[0] };

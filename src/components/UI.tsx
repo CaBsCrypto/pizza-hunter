@@ -20,7 +20,9 @@ import {
   Zap,
   Shield,
   Award,
-  Flame
+  Flame,
+  ChevronDown,
+  X
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
@@ -79,6 +81,23 @@ function ChefPreview3D({ color }: { color: string }) {
     </div>
   );
 }
+
+function VespaShowcase({ color }: { color: string }) {
+  return (
+    <div className="w-full h-[280px] md:h-[400px] relative overflow-hidden flex items-center justify-center pointer-events-auto">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl" />
+      <Canvas
+        camera={{ position: [0, 1.0, 3.0], fov: 40 }}
+        style={{ width: '100%', height: '100%', background: 'transparent' }}
+      >
+        <ambientLight intensity={2.2} />
+        <directionalLight position={[5, 10, 5]} intensity={3.5} />
+        <pointLight position={[-5, 5, -5]} intensity={1.5} color="#ffa502" />
+        <RotatingChef color={color} />
+      </Canvas>
+    </div>
+  );
+}
 import { playCountdownTickSound, playRoundOverSound } from '../utils/audio';
 
 export function UI() {
@@ -114,6 +133,8 @@ export function UI() {
     return localStorage.getItem('pizza_hunter_color') || '#ffa502';
   });
   const [showStats, setShowStats] = useState<boolean>(false);
+  const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
+  const [showColorDropdown, setShowColorDropdown] = useState<boolean>(false);
 
   const [highestScore, setHighestScore] = useState<number>(() => {
     const saved = localStorage.getItem('pizza_hunter_highscore');
@@ -774,192 +795,198 @@ export function UI() {
               </motion.div>
             )}
 
-            {/* MAIN MENU / MODE CONFIGURATION */}
+            {/* MAIN MENU / LANDING PAGE */}
             {!gameState && !isInLobby && (
-              <motion.div
-                initial={{ scale: 0.95 }}
-                animate={{ scale: 1 }}
-                className="bg-neutral-900/95 border border-white/10 rounded-3xl shadow-2xl max-w-4xl w-full grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 p-4 md:p-8 overflow-y-auto max-h-[92vh] md:max-h-none"
-              >
-                {/* LEFT PANEL: Character Showcase & Customization (Clash Royale Style Card) */}
-                <div className="md:col-span-5 flex flex-col gap-4 order-2 md:order-1">
-                  <div className="bg-black/30 border border-white/5 rounded-2xl p-4 flex flex-col gap-4 relative overflow-hidden group">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="bg-amber-500/20 text-amber-400 p-1.5 rounded-lg">
-                          <Crown size={16} />
-                        </div>
-                        <div>
-                          <h4 className="text-xs font-black text-white leading-none uppercase">{chefName || 'Chef'}</h4>
-                          <span className="text-[9px] text-amber-500 font-mono font-bold tracking-wider">CARTA DE PERSONAJE</span>
-                        </div>
-                      </div>
-                      <span className="text-[10px] bg-amber-500 text-neutral-950 font-black font-mono px-2 py-0.5 rounded-full">NIVEL 1</span>
-                    </div>
-
-                    {/* 3D Model View */}
-                    <ChefPreview3D color={selectedColor} />
-
-                    {/* Skin Color Picker */}
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-white/40 text-[10px] font-mono uppercase tracking-wider">Pintura Vespa (Skin)</label>
-                      <div className="flex gap-2">
-                        {DRIVER_COLORS.map((c) => (
-                          <button
-                            key={c.hex}
-                            type="button"
-                            onClick={() => {
-                              setSelectedColor(c.hex);
-                              localStorage.setItem('pizza_hunter_color', c.hex);
-                            }}
-                            className={`w-7 h-7 rounded-full border-2 transition-all relative ${
-                              selectedColor === c.hex
-                                ? 'border-white scale-110 shadow-lg shadow-white/20'
-                                : 'border-transparent opacity-60 hover:opacity-100 hover:scale-105'
-                            } ${c.bg}`}
-                            title={c.name}
-                          >
-                            {selectedColor === c.hex && (
-                              <span className="absolute inset-0 flex items-center justify-center text-white text-[10px] font-bold">
-                                ✓
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Collapsible Character Stats */}
-                    <div className="border-t border-white/5 pt-1 mt-1">
-                      <button
-                        type="button"
-                        onClick={() => setShowStats(!showStats)}
-                        className="w-full flex items-center justify-between text-[10px] font-mono text-white/45 uppercase tracking-wider py-1.5 hover:text-white transition-colors"
-                      >
-                        <span className="flex items-center gap-1">📊 Estadísticas del Repartidor</span>
-                        <span className="text-[9px]">{showStats ? '▲ Ocultar' : '▼ Mostrar'}</span>
-                      </button>
-
-                      {showStats && (
-                        <div className="flex flex-col gap-2.5 pt-1.5 pb-0.5 animate-fadeIn">
-                          <div>
-                            <div className="flex justify-between text-[10px] font-bold font-mono text-white/50 mb-0.5">
-                              <span className="flex items-center gap-1"><Zap size={11} className="text-amber-400" /> VELOCIDAD MÁXIMA</span>
-                              <span className="text-amber-400">100 KM/H</span>
-                            </div>
-                            <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden border border-white/5">
-                              <div className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full" style={{ width: '100%' }} />
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between text-[10px] font-bold font-mono text-white/50 mb-0.5">
-                              <span className="flex items-center gap-1"><Flame size={11} className="text-orange-400" /> CORTE DERRAPE</span>
-                              <span className="text-orange-400">85%</span>
-                            </div>
-                            <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden border border-white/5">
-                              <div className="h-full bg-gradient-to-r from-orange-600 to-orange-400 rounded-full" style={{ width: '85%' }} />
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between text-[10px] font-bold font-mono text-white/50 mb-0.5">
-                              <span className="flex items-center gap-1"><Shield size={11} className="text-emerald-400" /> ESCUDO SPAWN</span>
-                              <span className="text-emerald-400">3.5S</span>
-                            </div>
-                            <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden border border-white/5">
-                              <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full" style={{ width: '70%' }} />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+              <div className="absolute inset-0 flex flex-col justify-between pointer-events-auto bg-black/85 backdrop-blur-md z-40 p-6 md:p-8 overflow-y-auto">
+                {/* Header */}
+                <div className="flex justify-between items-center w-full max-w-5xl mx-auto">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">🍕</span>
+                    <h1 className="text-xl font-black text-white tracking-widest font-mono">SLICE HUNTER</h1>
                   </div>
+                  {highestScore > 0 && (
+                    <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-1.5 text-xs text-amber-400 font-mono font-black tracking-wide">
+                      <Trophy size={14} className="fill-amber-500/10" />
+                      <span>RÉCORD: {highestScore} PIZZAS</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* RIGHT PANEL: Battle Matchmaking Config */}
-                <div className="md:col-span-7 flex flex-col justify-between gap-6 order-1 md:order-2">
-                  <div className="flex flex-col gap-4">
-                    {/* Header */}
-                    <div>
-                      <h2 className="text-3xl font-black text-amber-500 tracking-tight leading-none">PIZZA HUNTER</h2>
-                      <p className="text-white/60 text-xs mt-1.5">
-                        ¡Esquiva las mesas de trattoria y compite contra otros repartidores por apilar y defender tus pizzas en el restaurante!
+                {/* Main Body Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-center max-w-5xl w-full mx-auto my-auto">
+                  {/* Left Column: Text & Play CTA */}
+                  <div className="md:col-span-6 flex flex-col gap-6 text-center md:text-left justify-center">
+                    <div className="flex flex-col gap-3">
+                      <h2 className="text-4xl md:text-6xl font-black leading-none bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 bg-clip-text text-transparent tracking-tight uppercase">
+                        PIZZA HUNTER
+                      </h2>
+                      <p className="text-white/70 text-xs md:text-sm font-sans max-w-md mx-auto md:mx-0">
+                        ¡Esquiva las mesas del restaurante, compite contra otros repartidores por apilar cajas y defiende tus pizzas a toda velocidad en esta arena de reparto!
                       </p>
                     </div>
 
-                    <div className="h-px bg-white/10 w-full" />
-
-                    {/* Nickname Input */}
-                    <div className="w-full flex flex-col gap-1.5">
-                      <label className="text-white/40 text-[10px] font-mono uppercase tracking-wider flex items-center gap-1">
-                        <Crown size={11} className="text-amber-400" /> Nombre del Repartidor
-                      </label>
-                      <input
-                        type="text"
-                        value={chefName}
-                        onChange={(e) => setChefName(e.target.value)}
-                        maxLength={14}
-                        className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-base font-bold font-mono focus:outline-none focus:border-amber-500 transition-colors shadow-inner"
-                        placeholder="Tu apodo de Chef..."
-                      />
-                    </div>
-
-                    {/* Mode Selector Tabs */}
-                    <div className="w-full flex flex-col gap-1.5">
-                      <label className="text-white/40 text-[10px] font-mono uppercase tracking-wider">Modo de Juego</label>
-                      <div className="grid grid-cols-2 gap-2 bg-black/40 p-1 rounded-xl border border-white/5">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSolo(true)}
-                          className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold font-mono transition-all ${
-                            selectedSolo
-                              ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/10'
-                              : 'text-white/60 hover:text-white hover:bg-white/5'
-                          }`}
-                        >
-                          <Bot size={14} />
-                          <span>SOLO (Práctica)</span>
-                        </button>
-                        <button
-                          type="button"
-                          disabled
-                          className="relative flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold font-mono text-white/30 bg-black/20 overflow-hidden cursor-not-allowed"
-                        >
-                          <Users size={14} />
-                          <span>MULTIJUGADOR</span>
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
-                            <span className="text-[9px] bg-red-600/90 text-white px-2 py-0.5 rounded font-black tracking-widest border border-red-500/50 shadow-lg rotate-[-5deg]">PRÓXIMAMENTE</span>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Configuración compactada (Paneles eliminados) */}
-                  </div>
-
-                  {/* Battle CTA Actions */}
-                  <div className="flex flex-col gap-2.5 mt-2">
-                    {highestScore > 0 && (
-                      <div className="mx-auto inline-flex items-center gap-2 bg-amber-500/5 border border-amber-500/20 rounded-full px-3.5 py-1 text-[11px] text-amber-400 font-mono font-black tracking-wide w-fit">
-                        <Trophy size={13} className="text-amber-400 fill-amber-400/20" />
-                        <span>RÉCORD DE APILAMIENTO: {highestScore} PIZZAS</span>
-                      </div>
-                    )}
-
                     <button
-                      type="button"
-                      onClick={handleJoin}
-                      className="w-full py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-black rounded-xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-2 border-t border-white/20 shadow-xl shadow-amber-500/10"
+                      onClick={() => setShowConfigModal(true)}
+                      className="w-full md:w-64 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-black rounded-2xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-3 border-t border-white/20 shadow-2xl shadow-amber-500/20 group cursor-pointer"
                     >
-                      <span className="font-sans font-extrabold tracking-wide">
-                        {selectedSolo ? '¡INICIAR ENTRADAS!' : '¡BUSCAR OPONENTES!'}
-                      </span>
-                      <ArrowRight size={18} />
+                      <span>JUGAR AHORA</span>
+                      <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                     </button>
                   </div>
+
+                  {/* Right Column: Vespa Showcase */}
+                  <div className="md:col-span-6 flex items-center justify-center">
+                    <VespaShowcase color={selectedColor} />
+                  </div>
                 </div>
-              </motion.div>
+
+                {/* Footer Credits */}
+                <div className="text-center text-[9px] font-mono text-white/30 tracking-wider">
+                  © 2026 Spicy Crust. Todos los derechos reservados.
+                </div>
+              </div>
+            )}
+
+            {/* CONFIGURATION POPUP MODAL */}
+            {!gameState && !isInLobby && showConfigModal && (
+              <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-auto">
+                {/* Backdrop Blur Overlay */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  onClick={() => setShowConfigModal(false)}
+                  className="absolute inset-0 bg-black/75 backdrop-blur-md cursor-pointer"
+                />
+
+                {/* Modal Container */}
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="bg-neutral-900 border border-white/10 rounded-3xl p-6 md:p-8 max-w-sm w-full relative z-10 flex flex-col gap-5 shadow-2xl overflow-y-auto max-h-[95vh]"
+                >
+                  {/* Modal Header */}
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-black text-amber-500 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Crown size={14} />
+                      Configurar Repartidor
+                    </h3>
+                    <button
+                      onClick={() => setShowConfigModal(false)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  <div className="h-px bg-white/10 w-full" />
+
+                  {/* Nickname Input */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-white/40 text-[9px] font-mono uppercase tracking-wider">
+                      Nombre del Repartidor
+                    </label>
+                    <input
+                      type="text"
+                      value={chefName}
+                      onChange={(e) => setChefName(e.target.value)}
+                      maxLength={14}
+                      className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-sm font-bold font-mono focus:outline-none focus:border-amber-500 transition-colors shadow-inner"
+                      placeholder="Tu apodo..."
+                    />
+                  </div>
+
+                  {/* Vespa Design Dropdown */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-white/40 text-[9px] font-mono uppercase tracking-wider">
+                      Pintura Vespa (Skin)
+                    </label>
+                    
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowColorDropdown(!showColorDropdown)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-amber-500 transition-colors shadow-inner cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className={`w-3.5 h-3.5 rounded-full border border-white/20 shadow-inner ${DRIVER_COLORS.find(c => c.hex === selectedColor)?.bg}`} />
+                          <span>{DRIVER_COLORS.find(c => c.hex === selectedColor)?.name}</span>
+                        </div>
+                        <ChevronDown size={14} className={`text-white/60 transition-transform ${showColorDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {showColorDropdown && (
+                        <>
+                          <div className="fixed inset-0 z-20" onClick={() => setShowColorDropdown(false)} />
+                          <div className="absolute left-0 right-0 mt-2 p-2 bg-neutral-900 border border-white/10 rounded-xl shadow-2xl z-30 grid grid-cols-3 gap-2 animate-fadeIn">
+                            {DRIVER_COLORS.map((c) => (
+                              <button
+                                key={c.hex}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedColor(c.hex);
+                                  localStorage.setItem('pizza_hunter_color', c.hex);
+                                  setShowColorDropdown(false);
+                                }}
+                                className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border transition-all cursor-pointer ${
+                                  selectedColor === c.hex
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                                    : 'bg-black/20 border-transparent text-white/60 hover:text-white hover:bg-white/5'
+                                }`}
+                              >
+                                <span className={`w-5 h-5 rounded-full border border-white/20 shadow-inner ${c.bg}`} />
+                                <span className="text-[9px] font-mono truncate max-w-full">{c.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Mode Selector Tabs */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-white/40 text-[9px] font-mono uppercase tracking-wider">Modo de Juego</label>
+                    <div className="grid grid-cols-2 gap-2 bg-black/40 p-1 rounded-xl border border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSolo(true)}
+                        className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+                          selectedSolo
+                            ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/10'
+                            : 'text-white/60 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <Bot size={14} />
+                        <span>SOLO (Práctica)</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        className="relative flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold font-mono text-white/30 bg-black/20 overflow-hidden cursor-not-allowed"
+                      >
+                        <Users size={14} />
+                        <span>MULTIJUGADOR</span>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+                          <span className="text-[8px] bg-red-600/90 text-white px-2 py-0.5 rounded font-black tracking-widest border border-red-500/50 shadow-lg rotate-[-5deg]">SOON</span>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Action Play Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowConfigModal(false);
+                      handleJoin();
+                    }}
+                    className="w-full py-3.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-black rounded-xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-2 border-t border-white/20 shadow-xl shadow-amber-500/10 cursor-pointer"
+                  >
+                    <span>¡INICIAR ENTRADAS!</span>
+                    <ArrowRight size={18} />
+                  </button>
+                </motion.div>
+              </div>
             )}
           </motion.div>
         )}

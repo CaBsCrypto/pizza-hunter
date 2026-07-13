@@ -797,9 +797,25 @@ export function UI() {
 
             {/* MAIN MENU / LANDING PAGE */}
             {!gameState && !isInLobby && (
-              <div className="absolute inset-0 flex flex-col justify-between pointer-events-auto bg-black/85 backdrop-blur-md z-40 p-6 md:p-8 overflow-y-auto">
+              <div 
+                className="absolute inset-0 flex flex-col justify-between pointer-events-auto bg-[#030303] overflow-y-auto p-6 md:p-8 z-40 relative"
+                style={{
+                  backgroundImage: `radial-gradient(rgba(245, 158, 11, 0.06) 1.5px, transparent 1.5px)`,
+                  backgroundSize: '32px 32px'
+                }}
+              >
+                {/* Neon Ambient Glows */}
+                <div className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-amber-500/5 rounded-full blur-[130px] pointer-events-none animate-pulse" style={{ animationDuration: '8s' }} />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[60vw] h-[60vw] bg-red-600/5 rounded-full blur-[130px] pointer-events-none animate-pulse" style={{ animationDuration: '12s' }} />
+
+                {/* Floating Emojis */}
+                <div className="absolute top-[25%] left-[8%] text-3xl opacity-[0.08] pointer-events-none animate-bounce" style={{ animationDuration: '6s' }}>🍕</div>
+                <div className="absolute bottom-[20%] left-[20%] text-2xl opacity-[0.05] pointer-events-none animate-bounce" style={{ animationDuration: '9s', animationDelay: '1s' }}>🍄</div>
+                <div className="absolute top-[18%] right-[15%] text-4xl opacity-[0.08] pointer-events-none animate-bounce" style={{ animationDuration: '7s', animationDelay: '0.5s' }}>🍕</div>
+                <div className="absolute bottom-[25%] right-[25%] text-3xl opacity-[0.05] pointer-events-none animate-bounce" style={{ animationDuration: '10s', animationDelay: '2s' }}>🍅</div>
+
                 {/* Header */}
-                <div className="flex justify-between items-center w-full max-w-5xl mx-auto">
+                <div className="flex justify-between items-center w-full max-w-5xl mx-auto z-10">
                   <div className="flex items-center gap-2">
                     <span className="text-2xl">🍕</span>
                     <h1 className="text-xl font-black text-white tracking-widest font-mono">SLICE HUNTER</h1>
@@ -813,7 +829,7 @@ export function UI() {
                 </div>
 
                 {/* Main Body Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-center max-w-5xl w-full mx-auto my-auto">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-center max-w-5xl w-full mx-auto my-auto z-10">
                   {/* Left Column: Text & Play CTA */}
                   <div className="md:col-span-6 flex flex-col gap-6 text-center md:text-left justify-center">
                     <div className="flex flex-col gap-3">
@@ -834,14 +850,20 @@ export function UI() {
                     </button>
                   </div>
 
-                  {/* Right Column: Vespa Showcase */}
-                  <div className="md:col-span-6 flex items-center justify-center">
+                  {/* Right Column: Vespa Showcase with platform */}
+                  <div className="md:col-span-6 flex flex-col items-center justify-center relative select-none">
+                    {/* Futuristic showroom base */}
+                    <div className="absolute bottom-6 w-60 h-14 bg-amber-500/5 rounded-full blur-md" />
+                    <div className="absolute bottom-8 w-52 h-10 border border-amber-500/20 rounded-full flex items-center justify-center" style={{ boxShadow: '0 0 30px rgba(245,158,11,0.15), inset 0 0 20px rgba(245,158,11,0.05)' }}>
+                      <div className="w-[94%] h-[94%] border border-dashed border-amber-500/10 rounded-full animate-spin" style={{ animationDuration: '30s' }} />
+                    </div>
+                    {/* Floating Vespa */}
                     <VespaShowcase color={selectedColor} />
                   </div>
                 </div>
 
                 {/* Footer Credits */}
-                <div className="text-center text-[9px] font-mono text-white/30 tracking-wider">
+                <div className="text-center text-[9px] font-mono text-white/30 tracking-wider z-10">
                   © 2026 Spicy Crust. Todos los derechos reservados.
                 </div>
               </div>

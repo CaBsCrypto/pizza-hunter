@@ -62,15 +62,27 @@ export function ChefModel({ color, isUI = false }: { color: string; isUI?: boole
         }
       }
     });
+
+    // Automatically calculate bounding box to fix the pivot/anchor point
+    const box = new THREE.Box3().setFromObject(clone);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+
+    // Offset the internal model position so that:
+    // 1. Geometric center in X and Z is exactly at 0 (centers the rotation axis)
+    // 2. The bottom of the wheels (min Y) sits exactly on the floor (Y = 0)
+    clone.position.set(-center.x, -box.min.y, -center.z);
+
     return clone;
   }, [scene, color]);
 
-  // Adjust model orientation: Since the Tripo GLB is already Z-up natively:
-  // For UI: No rotation needed here, parent group in UI.tsx handles Z-up to Y-up translation.
-  // For Game: Keep X/Y rotation at 0 and only rotate Z by -Math.PI / 2 to face forward.
-  const rotation = isUI ? [0, 0, 0] : [0, 0, -Math.PI / 2];
+  // Adjust model orientation: GLTF (Y-up, -Z forward) -> Game (Z-up, +X forward)
+  // For UI: Keep it Y-up and scale up to 1.2 for prominent showcase.
+  // For Game: Lay it flat on the XY plane at 1.35 scale (much bigger to match gameplay bounds).
+  const rotation = isUI ? [0, 0, 0] : [Math.PI / 2, 0, -Math.PI / 2];
   const scale = isUI ? [1.2, 1.2, 1.2] : [1.35, 1.35, 1.35];
-  const position = isUI ? [0, -0.45, 0] : [0, 0, 0.1];
+  // Since model base is at Y=0 locally, we place it slightly above floor level in game
+  const position = isUI ? [0, -0.3, 0] : [0, 0, 0.1];
 
   return (
     <group rotation={rotation as any} scale={scale as any} position={position as any}>

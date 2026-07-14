@@ -84,7 +84,7 @@ function ChefPreview3D({ color }: { color: string }) {
 
 function VespaShowcase({ color }: { color: string }) {
   return (
-    <div className="w-full h-[280px] md:h-[400px] relative overflow-hidden flex items-center justify-center pointer-events-auto">
+    <div className="w-full h-[200px] md:h-[380px] relative overflow-hidden flex items-center justify-center pointer-events-auto">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl" />
       <Canvas
         camera={{ position: [0, 1.0, 3.0], fov: 40 }}
@@ -876,10 +876,11 @@ export function UI() {
             {/* MAIN MENU / LANDING PAGE */}
             {!gameState && !isInLobby && (
               <div 
-                className="fixed inset-0 flex flex-col justify-between pointer-events-auto bg-[#030303] overflow-y-auto p-6 md:p-8 z-40"
+                className="fixed inset-0 flex flex-col justify-between pointer-events-auto bg-[#030303] overflow-hidden p-6 md:p-8 z-40 select-none touch-none"
                 style={{
-                  backgroundImage: `radial-gradient(rgba(245, 158, 11, 0.06) 1.5px, transparent 1.5px)`,
-                  backgroundSize: '32px 32px'
+                  backgroundImage: `linear-gradient(rgba(3, 3, 3, 0.75), rgba(3, 3, 3, 0.85)), url(/pizza_arena_bg.png)`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
                 }}
               >
                 {/* Neon Ambient Glows */}

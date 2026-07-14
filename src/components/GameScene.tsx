@@ -68,7 +68,8 @@ export function ChefModel({ color, isUI = false }: { color: string; isUI?: boole
   // Adjust model orientation: GLTF (Y-up, -Z forward) -> Game (Z-up, +X forward)
   // For UI: Keep it Y-up and scale up to 1.15 to make it look prominent.
   // For Game: Lay it flat on the XY plane at 0.65 scale.
-  const rotation = isUI ? [0, 0, 0] : [Math.PI / 2, 0, -Math.PI / 2];
+  // Change Z rotation to 0 to align the forward vector.
+  const rotation = isUI ? [0, 0, 0] : [Math.PI / 2, 0, 0];
   const scale = isUI ? [1.15, 1.15, 1.15] : [0.65, 0.65, 0.65];
   const position = isUI ? [0, -0.3, 0] : [0, 0, 0.15];
 

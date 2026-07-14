@@ -68,7 +68,7 @@ function ChefPreview3D({ color }: { color: string }) {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl group-hover:bg-amber-500/10 transition-all duration-700" />
 
       <Canvas
-        camera={{ position: [0, 1.2, 3.2], fov: 45 }}
+        camera={{ position: [0, 0.22, 1.42], fov: 45 }}
         style={{ width: '100%', height: '100%' }}
       >
         <ambientLight intensity={1.8} />
@@ -85,7 +85,7 @@ function VespaShowcase({ color }: { color: string }) {
     <div className="w-full h-[200px] md:h-[380px] relative overflow-hidden flex items-center justify-center pointer-events-auto">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl" />
       <Canvas
-        camera={{ position: [0, 1.0, 3.0], fov: 40 }}
+        camera={{ position: [0, 0.2, 1.35], fov: 40 }}
         style={{ width: '100%', height: '100%', background: 'transparent' }}
       >
         <ambientLight intensity={2.2} />

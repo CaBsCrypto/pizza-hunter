@@ -31,6 +31,56 @@ funciona en plataformas serverless como Vercel Functions.
 
 ## Estado del proyecto
 
-Ver [REFACTOR_PLAN.md](REFACTOR_PLAN.md) para el plan de refactorización en curso
-(motor de simulación compartido, anti-cheat, persistencia) y [TICKETS.md](TICKETS.md) /
-[BACKLOG_Y_SPRINTS.md](BACKLOG_Y_SPRINTS.md) para el backlog detallado.
+Ver [REFACTOR_PLAN.md](REFACTOR_PLAN.md) para el plan de refactorización en curso (motor de simulación compartido, anti-cheat, persistencia) y [TICKETS.md](TICKETS.md) / [BACKLOG_Y_SPRINTS.md](BACKLOG_Y_SPRINTS.md) para el backlog detallado.
+
+---
+
+## 🎨 Guía de Desarrollo para Colaboradores (Diseño y Frontend)
+
+El código está estructurado en una **Arquitectura Desacoplada** para permitir cambiar todo el aspecto estético, 3D y 2D del juego sin alterar las físicas o la sincronización de red.
+
+### Estructura por Capas
+* **Capa 2D / UI (`src/components/UI.tsx` o `src/components/ui/`):** Contiene todos los menús, botones, pop-ups de configuración y el HUD del juego en pantalla. Si vas a rehacer los menús de inicio o la UI flotante, **este es el archivo principal a modificar**.
+* **Capa 3D / Escenario (`src/components/GameScene.tsx`):** Contiene el Canvas de Three.js (luces, texturas de mesas, mallas, renderizado de la Vespa). Si vas a cambiar modelos 3D, cámaras o iluminación, edita este archivo.
+* **Capa Lógica (`src/hooks/useGameInput.ts` y `src/store/gameStore.ts`):** **No modificar.** Contiene el control de teclado/mando y el estado global (pizzas acumuladas, puntuación, conexión). La UI consume estas variables de forma limpia.
+
+---
+
+## 🚀 Flujo de Trabajo Colaborativo (Git + Vercel Previews)
+
+Para contribuir con una nueva interfaz o cambio visual, sigue estos pasos:
+
+1. **Clonar e Instalar:**
+   ```bash
+   git clone <url-del-repo>
+   cd proud-turing
+   npm install
+   ```
+2. **Crear una Rama Nueva:**
+   *(Nunca trabajes directo sobre `master`)*
+   ```bash
+   git checkout -b feat/nombre-de-tu-cambio
+   ```
+3. **Correr en Local:**
+   ```bash
+   npm run dev
+   ```
+   Abre `http://localhost:3008` en tu navegador para ver los cambios en tiempo real.
+4. **Verificar antes de subir:**
+   Asegúrate de que no haya errores de TypeScript compilando el bundle:
+   ```bash
+   npm run build
+   ```
+5. **Subir rama y crear Pull Request:**
+   Sube tus cambios a GitHub:
+   ```bash
+   git add .
+   git commit -m "design: descripción de tu nuevo diseño"
+   git push origin feat/nombre-de-tu-cambio
+   ```
+   Entra a GitHub y presiona **"New Pull Request"**.
+
+6. **Validación Automática (Vercel Preview):**
+   Al crear el Pull Request, Vercel generará un comentario automático en GitHub con un enlace llamado **"Preview"**. 
+   * Abre ese link desde tu celular o computadora para validar el diseño en tiempo real antes de fusionarlo.
+   * Si todo está correcto, el administrador del proyecto aceptará el Pull Request (Merge) y el nuevo diseño pasará a estar activo en producción en segundos.

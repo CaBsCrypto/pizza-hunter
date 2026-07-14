@@ -15,15 +15,25 @@ function getAudioContext(): AudioContext {
   return audioCtx;
 }
 
+/** Helper to automatically clean up and disconnect Web Audio nodes when sound ends */
+function autoCleanup(duration: number, ...nodes: (OscillatorNode | GainNode | AudioBufferSourceNode | BiquadFilterNode)[]) {
+  setTimeout(() => {
+    nodes.forEach(node => {
+      try {
+        node.disconnect();
+      } catch {}
+    });
+  }, (duration * 1000) + 100);
+}
+
 /**
- * Plays a bright, cute chime sound representing a pizza being collected.
+ * Plays a comical squeaky sound representing collecting a pizza.
  */
 export function playPizzaCollectSound() {
   try {
     const ctx = getAudioContext();
     const now = ctx.currentTime;
 
-    // We'll use two oscillators for a sweet layered "pop/chime" sound
     const osc1 = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
     const gainNode = ctx.createGain();
@@ -47,6 +57,8 @@ export function playPizzaCollectSound() {
     osc2.start(now);
     osc1.stop(now + 0.25);
     osc2.stop(now + 0.25);
+
+    autoCleanup(0.25, osc1, osc2, gainNode);
   } catch (error) {
     console.warn('Could not play collect sound:', error);
   }
@@ -60,15 +72,13 @@ export function playCrashSound() {
     const ctx = getAudioContext();
     const now = ctx.currentTime;
 
-    // A low warm thud with a quick cartoon bend
     const osc = ctx.createOscillator();
     const gainNode = ctx.createGain();
 
-    osc.type = 'triangle'; // Warm and gentle, not harsh like sawtooth!
+    osc.type = 'triangle';
     osc.frequency.setValueAtTime(220, now);
     osc.frequency.exponentialRampToValueAtTime(55, now + 0.35);
 
-    // Low-pass filtered noise to simulate cardboard pizza boxes sliding/tumbling
     const bufferSize = ctx.sampleRate * 0.35; 
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -85,17 +95,15 @@ export function playCrashSound() {
     filter.frequency.exponentialRampToValueAtTime(50, now + 0.35);
 
     const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.08, now); // Softer noise gain (0.08 instead of 0.25)
+    noiseGain.gain.setValueAtTime(0.08, now);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
 
-    gainNode.gain.setValueAtTime(0.12, now); // Softer oscillator gain (0.12 instead of 0.2)
+    gainNode.gain.setValueAtTime(0.12, now);
     gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
 
-    // Connect synth oscillator
     osc.connect(gainNode);
     gainNode.connect(ctx.destination);
 
-    // Connect physical noise
     noise.connect(filter);
     filter.connect(noiseGain);
     noiseGain.connect(ctx.destination);
@@ -105,8 +113,40 @@ export function playCrashSound() {
     
     osc.stop(now + 0.35);
     noise.stop(now + 0.35);
+
+    autoCleanup(0.35, osc, gainNode, noise, filter, noiseGain);
   } catch (error) {
     console.warn('Could not play crash sound:', error);
+  }
+}
+
+/**
+ * Plays a soft cardboard friction collision sound.
+ */
+export function playPizzaCollisionSound() {
+  try {
+    const ctx = getAudioContext();
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(60, now + 0.15);
+
+    gainNode.gain.setValueAtTime(0.15, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+    osc.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.15);
+
+    autoCleanup(0.15, osc, gainNode);
+  } catch (error) {
+    console.warn('Could not play pizza collision sound:', error);
   }
 }
 
@@ -118,7 +158,6 @@ export function playShieldCollectSound() {
     const ctx = getAudioContext();
     const now = ctx.currentTime;
     
-    // Play an ascending arpeggio with 4 rapid notes
     const notes = [261.63, 329.63, 392.00, 523.25];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
@@ -137,6 +176,8 @@ export function playShieldCollectSound() {
       
       osc.start(now + i * 0.06);
       osc.stop(now + i * 0.06 + 0.25);
+
+      autoCleanup(i * 0.06 + 0.25, osc, gain);
     });
   } catch (error) {
     console.warn('Could not play shield collect sound:', error);
@@ -155,7 +196,6 @@ export function playShieldPopSound() {
     const osc2 = ctx.createOscillator();
     const gainNode = ctx.createGain();
     
-    // Futuristic glass burst/bubble pop sound
     osc1.type = 'sine';
     osc1.frequency.setValueAtTime(800, now);
     osc1.frequency.exponentialRampToValueAtTime(200, now + 0.25);
@@ -176,6 +216,8 @@ export function playShieldPopSound() {
     
     osc1.stop(now + 0.3);
     osc2.stop(now + 0.3);
+
+    autoCleanup(0.3, osc1, osc2, gainNode);
   } catch (error) {
     console.warn('Could not play shield pop sound:', error);
   }
@@ -204,6 +246,8 @@ export function playPizzaShootSound() {
 
     osc.start(now);
     osc.stop(now + 0.15);
+
+    autoCleanup(0.15, osc, gainNode);
   } catch (error) {
     console.warn('Could not play shoot sound:', error);
   }
@@ -221,7 +265,7 @@ export function playCountdownTickSound(isCritical: boolean = false) {
     const gainNode = ctx.createGain();
 
     osc.type = 'sine';
-    const freq = isCritical ? 880 : 440; // higher beep for final seconds
+    const freq = isCritical ? 880 : 440;
     osc.frequency.setValueAtTime(freq, now);
     osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.08);
 
@@ -233,6 +277,8 @@ export function playCountdownTickSound(isCritical: boolean = false) {
 
     osc.start(now);
     osc.stop(now + 0.1);
+
+    autoCleanup(0.1, osc, gainNode);
   } catch (error) {
     console.warn('Could not play countdown tick sound:', error);
   }
@@ -246,7 +292,6 @@ export function playRoundOverSound() {
     const ctx = getAudioContext();
     const now = ctx.currentTime;
 
-    // A classic descending game-over buzzer followed by a short ding
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
 
@@ -263,7 +308,8 @@ export function playRoundOverSound() {
     osc1.start(now);
     osc1.stop(now + 0.5);
 
-    // Chime shortly after
+    autoCleanup(0.5, osc1, gain1);
+
     setTimeout(() => {
       try {
         const osc2 = ctx.createOscillator();
@@ -282,6 +328,8 @@ export function playRoundOverSound() {
 
         osc2.start(chimeNow);
         osc2.stop(chimeNow + 0.4);
+
+        autoCleanup(0.4, osc2, gain2);
       } catch {}
     }, 400);
 
@@ -289,4 +337,3 @@ export function playRoundOverSound() {
     console.warn('Could not play round over sound:', error);
   }
 }
-

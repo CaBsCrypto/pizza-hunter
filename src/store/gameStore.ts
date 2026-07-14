@@ -14,7 +14,7 @@ import * as C from '../shared/constants';
 const soloEnv: Sim.SimEnv = {
   now: () => Date.now(),
   random: () => Math.random(),
-  uuid: () => uuidv4(),
+  uuid: () => Math.random().toString(36).substring(2, 11),
   emitShootEffect: (playerId, x, y) => {
     window.dispatchEvent(new CustomEvent('local_shoot_effect', { detail: { playerId, x, y } }));
   },

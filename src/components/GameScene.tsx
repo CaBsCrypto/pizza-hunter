@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { useGLTF } from '@react-three/drei';
 import { useGameStore, globalGameState } from '../store/gameStore';
 import { WORLD_SIZE, TURN_SPEED, BOOST_SPEED, BASE_SPEED, getTables, getMovingObstacles, MOVING_OBSTACLES_CONFIGS, MovingObstacleConfig } from '../shared/types';
 import { playPizzaCollectSound, playCrashSound, playShieldCollectSound, playShieldPopSound, playPizzaShootSound } from '../utils/audio';
@@ -37,392 +38,38 @@ function shadeColor(color: string, percent: number): string {
 
 // Chef model facing local +X axis by default
 export function ChefModel({ color }: { color: string }) {
-  const headSize = 0.38;
-
-  return (
-    <group>
-      {/* ==================== 1. MOTORCYCLE / SCOOTER VEHICLE ==================== */}
-      
-      {/* Back / Main Body Frame (Vespa curved style) */}
-      <mesh position={[-0.15, 0, 0.25]} rotation={[0, 0, 0]} castShadow receiveShadow>
-        <boxGeometry args={[0.7, 0.45, 0.45]} />
-        <meshStandardMaterial 
-          color={color} 
-          metalness={0.9} 
-          roughness={0.15} 
-        />
-      </mesh>
-      
-      {/* Front Nose Shield / Apron */}
-      <mesh position={[0.3, 0, 0.45]} rotation={[0, -0.3, 0]} castShadow>
-        <boxGeometry args={[0.1, 0.48, 0.65]} />
-        <meshStandardMaterial 
-          color={color} 
-          metalness={0.9} 
-          roughness={0.15} 
-        />
-      </mesh>
-
-      {/* Floorboard / Leg rest */}
-      <mesh position={[0.1, 0, 0.15]} castShadow>
-        <boxGeometry args={[0.4, 0.45, 0.06]} />
-        <meshStandardMaterial color="#1e272e" roughness={0.9} />
-      </mesh>
-
-      {/* Front Wheel Mudguard */}
-      <mesh position={[0.48, 0, 0.2]} castShadow>
-        <sphereGeometry args={[0.18, 12, 12]} />
-        <meshStandardMaterial color={color} metalness={0.8} roughness={0.2} />
-      </mesh>
-
-      {/* Wheels */}
-      {/* Front Wheel */}
-      <group position={[0.48, 0, -0.05]}>
-        {/* Tire */}
-        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.22, 0.22, 0.12, 16]} />
-          <meshStandardMaterial color="#0b0c10" roughness={0.95} />
-        </mesh>
-        {/* Steel Rim */}
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.11, 0.11, 0.13, 12]} />
-          <meshStandardMaterial color="#bdc3c7" metalness={0.95} roughness={0.1} />
-        </mesh>
-      </group>
-
-      {/* Rear Wheel */}
-      <group position={[-0.45, 0, -0.05]}>
-        {/* Tire */}
-        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.22, 0.22, 0.12, 16]} />
-          <meshStandardMaterial color="#0b0c10" roughness={0.95} />
-        </mesh>
-        {/* Steel Rim */}
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.11, 0.11, 0.13, 12]} />
-          <meshStandardMaterial color="#bdc3c7" metalness={0.95} roughness={0.1} />
-        </mesh>
-      </group>
-
-      {/* Handlebars / Steering column */}
-      <group position={[0.3, 0, 0.72]}>
-        {/* Fork Column */}
-        <mesh position={[0, 0, -0.1]} rotation={[0, -0.2, 0]} castShadow>
-          <cylinderGeometry args={[0.04, 0.04, 0.35, 8]} />
-          <meshStandardMaterial color="#bdc3c7" metalness={0.9} roughness={0.15} />
-        </mesh>
-        {/* Horizontal Bar */}
-        <mesh position={[0, 0, 0.08]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.03, 0.03, 0.65, 8]} />
-          <meshStandardMaterial color="#bdc3c7" metalness={0.95} roughness={0.1} />
-        </mesh>
-        {/* Left Grip */}
-        <mesh position={[0, -0.31, 0.08]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.035, 0.035, 0.1, 8]} />
-          <meshStandardMaterial color="#1e272e" roughness={0.9} />
-        </mesh>
-        {/* Right Grip */}
-        <mesh position={[0, 0.31, 0.08]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.035, 0.035, 0.1, 8]} />
-          <meshStandardMaterial color="#1e272e" roughness={0.9} />
-        </mesh>
-        {/* Rearview Mirrors */}
-        <group position={[-0.03, -0.22, 0.16]}>
-          <mesh rotation={[0, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.01, 0.01, 0.15, 8]} />
-            <meshStandardMaterial color="#bdc3c7" metalness={0.9} />
-          </mesh>
-          <mesh position={[0, 0, 0.08]} rotation={[0, Math.PI / 2, 0]}>
-            <cylinderGeometry args={[0.06, 0.06, 0.02, 12]} />
-            <meshStandardMaterial color="#bdc3c7" metalness={0.95} roughness={0.1} />
-          </mesh>
-        </group>
-        <group position={[-0.03, 0.22, 0.16]}>
-          <mesh rotation={[0, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.01, 0.01, 0.15, 8]} />
-            <meshStandardMaterial color="#bdc3c7" metalness={0.9} />
-          </mesh>
-          <mesh position={[0, 0, 0.08]} rotation={[0, Math.PI / 2, 0]}>
-            <cylinderGeometry args={[0.06, 0.06, 0.02, 12]} />
-            <meshStandardMaterial color="#bdc3c7" metalness={0.95} roughness={0.1} />
-          </mesh>
-        </group>
-      </group>
-
-      {/* Headlight (Glowing front circle) */}
-      <mesh position={[0.42, 0, 0.68]} rotation={[0, Math.PI / 2, 0]}>
-        <cylinderGeometry args={[0.09, 0.09, 0.03, 16]} />
-        <meshStandardMaterial 
-          color="#ffffff" 
-          emissive="#ffffff" 
-          emissiveIntensity={8.0} 
-          roughness={0.1}
-        />
-        <spotLight 
-          position={[0, 0.2, 0]} 
-          angle={0.8} 
-          penumbra={0.3} 
-          intensity={12.0} 
-          distance={35} 
-          castShadow 
-          color="#ffffff" 
-        />
-      </mesh>
-
-      {/* Red Tail Light */}
-      <mesh position={[-0.52, 0, 0.35]} rotation={[0, -Math.PI / 2, 0]}>
-        <boxGeometry args={[0.06, 0.12, 0.05]} />
-        <meshStandardMaterial 
-          color="#ff0000" 
-          emissive="#ff3f34" 
-          emissiveIntensity={4.0} 
-        />
-      </mesh>
-
-      {/* Exhaust Pipe */}
-      <mesh position={[-0.45, -0.22, 0.08]} rotation={[0.1, 0.1, 0]} castShadow>
-        <cylinderGeometry args={[0.05, 0.04, 0.45, 8]} />
-        <meshStandardMaterial color="#bdc3c7" metalness={0.95} roughness={0.05} />
-      </mesh>
-
-
-      {/* ==================== 2. DELIVERY CHEF RIDER ==================== */}
-
-      {/* Seat */}
-      <mesh position={[-0.08, 0, 0.5]} castShadow>
-        <boxGeometry args={[0.38, 0.32, 0.08]} />
-        <meshStandardMaterial color="#2d3436" roughness={0.9} />
-      </mesh>
-
-      {/* Rider's Torso */}
-      <group position={[-0.08, 0, 0.72]} rotation={[0, 0.15, 0]}>
-        <mesh castShadow>
-          <cylinderGeometry args={[0.26, 0.24, 0.42, 12]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.8} />
-        </mesh>
+  const { scene } = useGLTF('/delivery_scooter.glb');
+  
+  // Clone the scene for instanced/multi-player rendering
+  const clonedScene = useMemo(() => {
+    const clone = scene.clone();
+    
+    // Traversal to enable shadow map projections and customize materials
+    clone.traverse((child: any) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
         
-        {/* Red Scarf */}
-        <mesh position={[0, 0, 0.22]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.16, 0.04, 8, 16]} />
-          <meshStandardMaterial color="#d63031" roughness={0.7} />
-        </mesh>
+        if (child.material) {
+          child.material = child.material.clone();
+          child.material.roughness = 0.5;
+          child.material.metalness = 0.1;
+          
+          // Tint the material color slightly to reflect the user's selected color theme
+          const baseColor = new THREE.Color('#ffffff');
+          const playerColor = new THREE.Color(color);
+          child.material.color.copy(baseColor.lerp(playerColor, 0.12));
+        }
+      }
+    });
+    return clone;
+  }, [scene, color]);
 
-        {/* Buttons */}
-        <mesh position={[0.22, -0.06, 0.05]}>
-          <sphereGeometry args={[0.022, 8, 8]} />
-          <meshStandardMaterial color="#2d3436" roughness={0.5} />
-        </mesh>
-        <mesh position={[0.22, 0.06, 0.05]}>
-          <sphereGeometry args={[0.022, 8, 8]} />
-          <meshStandardMaterial color="#2d3436" roughness={0.5} />
-        </mesh>
-        <mesh position={[0.22, -0.06, -0.05]}>
-          <sphereGeometry args={[0.022, 8, 8]} />
-          <meshStandardMaterial color="#2d3436" roughness={0.5} />
-        </mesh>
-        <mesh position={[0.22, 0.06, -0.05]}>
-          <sphereGeometry args={[0.022, 8, 8]} />
-          <meshStandardMaterial color="#2d3436" roughness={0.5} />
-        </mesh>
-
-        {/* Arms holding handlebars */}
-        <mesh position={[0.18, -0.18, 0.1]} rotation={[0.4, 0.6, -0.4]} castShadow>
-          <cylinderGeometry args={[0.06, 0.05, 0.32, 8]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.8} />
-        </mesh>
-        <mesh position={[0.18, 0.18, 0.1]} rotation={[-0.4, 0.6, 0.4]} castShadow>
-          <cylinderGeometry args={[0.06, 0.05, 0.32, 8]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.8} />
-        </mesh>
-
-        {/* Skin Head */}
-        <group position={[0.04, 0, 0.35]}>
-          <mesh castShadow>
-            <sphereGeometry args={[headSize, 16, 16]} />
-            <meshStandardMaterial color="#ffddc1" roughness={0.6} />
-          </mesh>
-
-          {/* Cute Chef Nose */}
-          <mesh position={[0.35, 0, 0.01]} castShadow>
-            <sphereGeometry args={[0.075, 12, 12]} />
-            <meshStandardMaterial color="#ffb090" roughness={0.5} />
-          </mesh>
-
-          {/* Expressive Eyes (Nestled behind the goggles) */}
-          {/* Left Eye Sclera */}
-          <mesh position={[0.31, -0.09, 0.08]} castShadow>
-            <sphereGeometry args={[0.065, 12, 12]} />
-            <meshStandardMaterial color="#ffffff" roughness={0.9} />
-          </mesh>
-          {/* Left Eye Pupil */}
-          <mesh position={[0.365, -0.09, 0.08]}>
-            <sphereGeometry args={[0.028, 8, 8]} />
-            <meshStandardMaterial color="#1e272e" roughness={0.4} />
-          </mesh>
-
-          {/* Right Eye Sclera */}
-          <mesh position={[0.31, 0.09, 0.08]} castShadow>
-            <sphereGeometry args={[0.065, 12, 12]} />
-            <meshStandardMaterial color="#ffffff" roughness={0.9} />
-          </mesh>
-          {/* Right Eye Pupil */}
-          <mesh position={[0.365, 0.09, 0.08]}>
-            <sphereGeometry args={[0.028, 8, 8]} />
-            <meshStandardMaterial color="#1e272e" roughness={0.4} />
-          </mesh>
-
-          {/* Rosy Cheeks */}
-          <mesh position={[0.29, -0.18, -0.02]} castShadow>
-            <sphereGeometry args={[0.05, 8, 8]} />
-            <meshStandardMaterial color="#ff7979" roughness={0.8} />
-          </mesh>
-          <mesh position={[0.29, 0.18, -0.02]} castShadow>
-            <sphereGeometry args={[0.05, 8, 8]} />
-            <meshStandardMaterial color="#ff7979" roughness={0.8} />
-          </mesh>
-
-          {/* Happy Open Smile */}
-          <mesh position={[0.31, 0, -0.13]}>
-            <boxGeometry args={[0.02, 0.08, 0.04]} />
-            <meshStandardMaterial color="#5c0000" roughness={0.9} />
-          </mesh>
-
-          {/* Elegant Curly Chef Mustache */}
-          {/* Center Connection */}
-          <mesh position={[0.34, 0, -0.05]} castShadow>
-            <boxGeometry args={[0.05, 0.06, 0.06]} />
-            <meshStandardMaterial color="#2c3e50" roughness={0.9} />
-          </mesh>
-          {/* Left Wing */}
-          <mesh position={[0.33, -0.08, -0.06]} rotation={[0.1, 0, -0.25]} castShadow>
-            <boxGeometry args={[0.06, 0.15, 0.07]} />
-            <meshStandardMaterial color="#2c3e50" roughness={0.9} />
-          </mesh>
-          {/* Left Curly Tip */}
-          <mesh position={[0.31, -0.16, -0.04]} rotation={[0, 0, -0.6]} castShadow>
-            <boxGeometry args={[0.05, 0.08, 0.05]} />
-            <meshStandardMaterial color="#2c3e50" roughness={0.9} />
-          </mesh>
-          {/* Right Wing */}
-          <mesh position={[0.33, 0.08, -0.06]} rotation={[-0.1, 0, 0.25]} castShadow>
-            <boxGeometry args={[0.06, 0.15, 0.07]} />
-            <meshStandardMaterial color="#2c3e50" roughness={0.9} />
-          </mesh>
-          {/* Right Curly Tip */}
-          <mesh position={[0.31, 0.16, -0.04]} rotation={[0, 0, 0.6]} castShadow>
-            <boxGeometry args={[0.05, 0.08, 0.05]} />
-            <meshStandardMaterial color="#2c3e50" roughness={0.9} />
-          </mesh>
-
-          {/* Eyes with Glasses/Goggles */}
-          <group position={[0.24, 0, 0.06]}>
-            <mesh position={[-0.1, 0, 0.02]} rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[0.28, 0.02, 6, 16]} />
-              <meshStandardMaterial color="#2d3436" roughness={0.9} />
-            </mesh>
-            {/* Left Lens Frame & Glass (aligned correctly pointing forward!) */}
-            <mesh position={[0.1, -0.09, 0.02]} rotation={[0, 0, Math.PI / 2]} castShadow>
-              <cylinderGeometry args={[0.085, 0.085, 0.03, 12]} />
-              <meshStandardMaterial color="#2d3436" roughness={0.9} />
-            </mesh>
-            <mesh position={[0.11, -0.09, 0.02]} rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.075, 0.075, 0.031, 12]} />
-              <meshStandardMaterial color="#0984e3" metalness={0.9} roughness={0.1} transparent opacity={0.65} />
-            </mesh>
-            {/* Right Lens Frame & Glass (aligned correctly pointing forward!) */}
-            <mesh position={[0.1, 0.09, 0.02]} rotation={[0, 0, Math.PI / 2]} castShadow>
-              <cylinderGeometry args={[0.085, 0.085, 0.03, 12]} />
-              <meshStandardMaterial color="#2d3436" roughness={0.9} />
-            </mesh>
-            <mesh position={[0.11, 0.09, 0.02]} rotation={[0, 0, Math.PI / 2]}>
-              <cylinderGeometry args={[0.075, 0.075, 0.031, 12]} />
-              <meshStandardMaterial color="#0984e3" metalness={0.9} roughness={0.1} transparent opacity={0.65} />
-            </mesh>
-            {/* Goggles Bridge */}
-            <mesh position={[0.1, 0, 0.02]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-              <cylinderGeometry args={[0.015, 0.015, 0.1, 8]} />
-              <meshStandardMaterial color="#2d3436" roughness={0.9} />
-            </mesh>
-          </group>
-
-          {/* Chef Hat */}
-          <group position={[-0.05, 0, 0.32]} rotation={[0, -0.08, 0]}>
-            <mesh position={[0, 0, -0.05]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-              <cylinderGeometry args={[0.26, 0.26, 0.12, 16]} />
-              <meshStandardMaterial color="#ffffff" roughness={0.8} />
-            </mesh>
-            <mesh position={[0, 0, 0.1]} castShadow>
-              <sphereGeometry args={[0.34, 16, 16]} />
-              <meshStandardMaterial color="#ffffff" roughness={0.9} />
-            </mesh>
-          </group>
-        </group>
-      </group>
-
-
-      {/* ==================== 3. BACK DELIVERY RACK & PIZZA BOX STACK ==================== */}
-      
-      {/* Chrome Luggage Rack Structure */}
-      <group position={[-0.58, 0, 0.44]}>
-        <mesh position={[0.1, -0.12, -0.12]} rotation={[0.4, 0.2, 0]} castShadow>
-          <cylinderGeometry args={[0.015, 0.015, 0.22, 8]} />
-          <meshStandardMaterial color="#bdc3c7" metalness={0.95} />
-        </mesh>
-        <mesh position={[0.1, 0.12, -0.12]} rotation={[-0.4, 0.2, 0]} castShadow>
-          <cylinderGeometry args={[0.015, 0.015, 0.22, 8]} />
-          <meshStandardMaterial color="#bdc3c7" metalness={0.95} />
-        </mesh>
-        <mesh position={[0, 0, 0]} castShadow>
-          <boxGeometry args={[0.3, 0.35, 0.02]} />
-          <meshStandardMaterial color="#bdc3c7" metalness={0.95} roughness={0.1} />
-        </mesh>
-      </group>
-
-      {/* Stack of static Pizza Boxes on the back rack */}
-      {/* Box 1 (Bottom, largest, aligned) */}
-      <group position={[-0.58, 0, 0.52]}>
-        <mesh castShadow>
-          <boxGeometry args={[0.34, 0.34, 0.07]} />
-          <meshStandardMaterial color="#f5f6fa" roughness={0.7} />
-        </mesh>
-        <mesh position={[0, 0, 0.036]}>
-          <boxGeometry args={[0.34, 0.06, 0.002]} />
-          <meshStandardMaterial color="#e84118" roughness={0.7} />
-        </mesh>
-        <mesh position={[0.1, 0, 0.036]}>
-          <boxGeometry args={[0.02, 0.34, 0.002]} />
-          <meshStandardMaterial color="#44bd32" roughness={0.7} />
-        </mesh>
-      </group>
-
-      {/* Box 2 (Middle, slightly smaller, slightly rotated) */}
-      <group position={[-0.58, 0.02, 0.6]} rotation={[0, 0, 0.18]}>
-        <mesh castShadow>
-          <boxGeometry args={[0.32, 0.32, 0.07]} />
-          <meshStandardMaterial color="#f5f6fa" roughness={0.7} />
-        </mesh>
-        <mesh position={[0, 0, 0.036]}>
-          <boxGeometry args={[0.32, 0.05, 0.002]} />
-          <meshStandardMaterial color="#e84118" roughness={0.7} />
-        </mesh>
-        <mesh position={[-0.08, 0, 0.036]}>
-          <boxGeometry args={[0.02, 0.32, 0.002]} />
-          <meshStandardMaterial color="#44bd32" roughness={0.7} />
-        </mesh>
-      </group>
-
-      {/* Box 3 (Top, slightly smaller, rotated the other way) */}
-      <group position={[-0.58, -0.01, 0.68]} rotation={[0, 0, -0.12]}>
-        <mesh castShadow>
-          <boxGeometry args={[0.3, 0.3, 0.07]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.6} />
-        </mesh>
-        <mesh position={[0, 0, 0.036]}>
-          <boxGeometry args={[0.12, 0.12, 0.002]} />
-          <meshStandardMaterial color="#e84118" roughness={0.7} />
-        </mesh>
-      </group>
-
+  // Adjust model orientation: GLTF (Y-up, -Z forward) -> Game (Z-up, +X forward)
+  // Scale it down slightly (e.g. 0.65) to match the bounds of the original Vespa showroom
+  return (
+    <group rotation={[Math.PI / 2, 0, -Math.PI / 2]} scale={[0.65, 0.65, 0.65]} position={[0, 0, 0.15]}>
+      <primitive object={clonedScene} />
     </group>
   );
 }

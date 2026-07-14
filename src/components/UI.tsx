@@ -798,7 +798,7 @@ export function UI() {
             {/* MAIN MENU / LANDING PAGE */}
             {!gameState && !isInLobby && (
               <div 
-                className="absolute inset-0 flex flex-col justify-between pointer-events-auto bg-[#030303] overflow-y-auto p-6 md:p-8 z-40 relative"
+                className="fixed inset-0 flex flex-col justify-between pointer-events-auto bg-[#030303] overflow-y-auto p-6 md:p-8 z-40"
                 style={{
                   backgroundImage: `radial-gradient(rgba(245, 158, 11, 0.06) 1.5px, transparent 1.5px)`,
                   backgroundSize: '32px 32px'

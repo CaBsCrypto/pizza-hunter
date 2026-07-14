@@ -939,15 +939,21 @@ export function UI() {
                     </div>
                   </div>
 
-                  {/* Right Column: Vespa Showcase with platform */}
-                  <div className="md:col-span-6 flex flex-col items-center justify-center relative select-none">
-                    {/* Futuristic showroom base */}
-                    <div className="absolute bottom-6 w-60 h-14 bg-amber-500/5 rounded-full blur-md" />
-                    <div className="absolute bottom-8 w-52 h-10 border border-amber-500/20 rounded-full flex items-center justify-center" style={{ boxShadow: '0 0 30px rgba(245,158,11,0.15), inset 0 0 20px rgba(245,158,11,0.05)' }}>
-                      <div className="w-[94%] h-[94%] border border-dashed border-amber-500/10 rounded-full animate-spin" style={{ animationDuration: '30s' }} />
+                  {/* Right Column: Vespa Showcase Holographic Card */}
+                  <div className="md:col-span-6 flex flex-col items-center justify-center relative select-none bg-black/45 border border-white/10 rounded-3xl backdrop-blur-md p-4 md:p-6 w-full max-w-sm mx-auto shadow-2xl">
+                    <span className="text-[10px] font-black text-amber-500 tracking-widest uppercase font-mono mb-1">
+                      ⚡ TU REPARTIDOR 3D ⚡
+                    </span>
+                    
+                    <div className="relative w-full flex items-center justify-center">
+                      {/* Futuristic showroom base */}
+                      <div className="absolute bottom-4 w-44 h-10 bg-amber-500/5 rounded-full blur-md" />
+                      <div className="absolute bottom-6 w-36 h-8 border border-amber-500/20 rounded-full flex items-center justify-center" style={{ boxShadow: '0 0 30px rgba(245,158,11,0.15), inset 0 0 20px rgba(245,158,11,0.05)' }}>
+                        <div className="w-[94%] h-[94%] border border-dashed border-amber-500/10 rounded-full animate-spin" style={{ animationDuration: '30s' }} />
+                      </div>
+                      {/* Floating Vespa */}
+                      <VespaShowcase color={selectedColor} />
                     </div>
-                    {/* Floating Vespa */}
-                    <VespaShowcase color={selectedColor} />
                   </div>
                 </div>
 

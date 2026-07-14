@@ -44,15 +44,13 @@ function RotatingChef({ color }: { color: string }) {
   useFrame((state) => {
     if (groupRef.current) {
       groupRef.current.rotation.y = state.clock.getElapsedTime() * 0.95;
-      groupRef.current.position.y = -0.8 + Math.sin(state.clock.getElapsedTime() * 2.2) * 0.035;
+      groupRef.current.position.y = -0.2 + Math.sin(state.clock.getElapsedTime() * 2.2) * 0.035;
     }
   });
 
   return (
     <group ref={groupRef}>
-      <group rotation={[-Math.PI / 2, 0, 0]} scale={[1.0, 1.0, 1.0]}>
-        <ChefModel color={color} />
-      </group>
+      <ChefModel color={color} isUI={true} />
     </group>
   );
 }

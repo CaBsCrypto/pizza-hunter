@@ -37,7 +37,7 @@ function shadeColor(color: string, percent: number): string {
 
 
 // Chef model facing local +X axis by default
-export function ChefModel({ color }: { color: string }) {
+export function ChefModel({ color, isUI = false }: { color: string; isUI?: boolean }) {
   const { scene } = useGLTF('/delivery_scooter.glb');
   
   // Clone the scene for instanced/multi-player rendering
@@ -66,9 +66,14 @@ export function ChefModel({ color }: { color: string }) {
   }, [scene, color]);
 
   // Adjust model orientation: GLTF (Y-up, -Z forward) -> Game (Z-up, +X forward)
-  // Scale it down slightly (e.g. 0.65) to match the bounds of the original Vespa showroom
+  // For UI: Keep it Y-up and scale up to 1.15 to make it look prominent.
+  // For Game: Lay it flat on the XY plane at 0.65 scale.
+  const rotation = isUI ? [0, 0, 0] : [Math.PI / 2, 0, -Math.PI / 2];
+  const scale = isUI ? [1.15, 1.15, 1.15] : [0.65, 0.65, 0.65];
+  const position = isUI ? [0, -0.3, 0] : [0, 0, 0.15];
+
   return (
-    <group rotation={[Math.PI / 2, 0, -Math.PI / 2]} scale={[0.65, 0.65, 0.65]} position={[0, 0, 0.15]}>
+    <group rotation={rotation as any} scale={scale as any} position={position as any}>
       <primitive object={clonedScene} />
     </group>
   );

@@ -76,12 +76,12 @@ export function ChefModel({ color, isUI = false }: { color: string; isUI?: boole
     return clone;
   }, [scene, color]);
 
-  // Adjust model orientation: Since the Tripo GLB is Y-up natively:
-  // For UI (Y-up canvas): Keep rotation at [0, 0, 0] so it stands upright on its wheels naturally.
-  // For Game (Z-up top-down): Rotate 90deg on X to make it Z-up, and 90deg on Z to face forward (+X).
-  const rotation = isUI ? [0, 0, 0] : [Math.PI / 2, 0, Math.PI / 2];
+  // Adjust model orientation: Since the Tripo GLB is Z-up natively:
+  // For UI (Y-up canvas): Rotate 90deg on X [Math.PI / 2, 0, 0] to translate Z-up to Y-up.
+  // For Game (Z-up top-down): Keep X/Y rotation at 0 and only rotate Z by -Math.PI / 2 to face forward.
+  const rotation = isUI ? [Math.PI / 2, 0, 0] : [0, 0, -Math.PI / 2];
   const scale = isUI ? [1.2, 1.2, 1.2] : [1.35, 1.35, 1.35];
-  const position = isUI ? [0, -0.3, 0] : [0, 0, 0.1];
+  const position = isUI ? [0, -0.45, 0] : [0, 0, 0.1];
 
   return (
     <group rotation={rotation as any} scale={scale as any} position={position as any}>

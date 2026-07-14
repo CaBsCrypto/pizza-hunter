@@ -79,8 +79,8 @@ export function ChefModel({ color, isUI = false }: { color: string; isUI?: boole
 
   // Adjust model orientation: Since the Tripo GLB is Y-up natively:
   // For UI (Y-up canvas): Keep rotation at [0, 0, 0] so it stands upright on its wheels naturally.
-  // For Game (Z-up top-down): Rotate 90deg on X to stand upright on wheels, and -90deg on Z to face forward.
-  const rotation = isUI ? [0, 0, 0] : [Math.PI / 2, 0, -Math.PI / 2];
+  // For Game (Z-up top-down): Rotate 90deg on X to stand upright on wheels, and 90deg on Z to face forward (+X).
+  const rotation = isUI ? [0, 0, 0] : [Math.PI / 2, 0, Math.PI / 2];
   const scale = isUI ? [0.97, 0.97, 0.97] : [1.09, 1.09, 1.09];
   const position = isUI ? [0, -0.3, 0] : [0, 0, 0.1];
 
@@ -1921,26 +1921,31 @@ export function GameScene() {
             localPlayerRef.current.lastSendTime = now;
           }
         }
+
+        // Apply smooth 3D isometric follow camera (Y offset -12, Z offset 12)
+        const lerpSpeedX = 10 * delta;
+        const lerpSpeedY = 10 * delta;
+        const lerpSpeedZ = 4 * delta;
+        
+        const targetCamX = head.x;
+        const targetCamY = head.y - 12;
+        const targetCamZ = 12;
+
+        camera.position.x += (targetCamX - camera.position.x) * lerpSpeedX;
+        camera.position.y += (targetCamY - camera.position.y) * lerpSpeedY;
+        camera.position.z += (targetCamZ - camera.position.z) * lerpSpeedZ;
+
+        // Focus camera on the 3D position of the player's head
+        camera.lookAt(head.x, head.y, 0.5);
+
+        // Keep shadows sharp by following the player with the light
+        if (lightRef.current && lightTarget) {
+          lightRef.current.position.set(camera.position.x + 10, camera.position.y - 10, 30);
+          lightTarget.position.set(camera.position.x, camera.position.y, 0);
+        }
       }
     } else {
       localPlayerRef.current.active = false;
-    }
-
-    // Smoothly move the base camera position toward target
-    const lerpSpeedX = 10 * delta;
-    const lerpSpeedY = 10 * delta;
-    const lerpSpeedZ = 4 * delta;
-    camera.position.x += (cameraTarget.current.x - camera.position.x) * lerpSpeedX;
-    camera.position.y += (cameraTarget.current.y - camera.position.y) * lerpSpeedY;
-    camera.position.z += (cameraTarget.current.z - camera.position.z) * lerpSpeedZ;
-
-    // Always look at the un-shaken camera position
-    camera.lookAt(camera.position.x, camera.position.y, 0);
-
-    // Make the directional light follow the camera to keep shadows crisp
-    if (lightRef.current) {
-      lightRef.current.position.set(camera.position.x + 10, camera.position.y - 10, 30);
-      lightTarget.position.set(camera.position.x, camera.position.y, 0);
     }
   });
 

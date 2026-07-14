@@ -135,6 +135,23 @@ export function UI() {
   const [showStats, setShowStats] = useState<boolean>(false);
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
   const [showColorDropdown, setShowColorDropdown] = useState<boolean>(false);
+  const [showHighscoresModal, setShowHighscoresModal] = useState<boolean>(false);
+  const [hasSavedRecord, setHasSavedRecord] = useState<boolean>(false);
+  const [localHighscores, setLocalHighscores] = useState<{name: string, score: number, date: string}[]>(() => {
+    const saved = localStorage.getItem('pizza_hunter_local_highscores');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [
+      { name: 'Chef Mario', score: 25, date: '2026-07-10' },
+      { name: 'Chef Luigi', score: 20, date: '2026-07-11' },
+      { name: 'Chef Peach', score: 15, date: '2026-07-12' },
+      { name: 'Chef Yoshi', score: 10, date: '2026-07-13' },
+      { name: 'Chef Toad', score: 6, date: '2026-07-14' }
+    ];
+  });
 
   const [highestScore, setHighestScore] = useState<number>(() => {
     const saved = localStorage.getItem('pizza_hunter_highscore');
@@ -185,6 +202,8 @@ export function UI() {
     if (!selectedSolo) {
       setRoomConfig(selectedSize, selectedPrivate, inputCode);
     }
+
+    setHasSavedRecord(false);
 
     // Join with selected color
     joinGame(cleanName, selectedColor);
@@ -755,45 +774,104 @@ export function UI() {
             )}
 
             {/* GAME OVER SCREEN */}
-            {isDead && !gameState?.isRoundOver && (
-              <motion.div
-                initial={{ scale: 0.95, y: 15 }}
-                animate={{ scale: 1, y: 0 }}
-                className="bg-neutral-900/95 p-8 rounded-3xl border border-white/10 shadow-2xl max-w-md w-full flex flex-col items-center gap-6"
-              >
-                <div className="text-center w-full">
-                  <h2 className="text-4xl font-black text-red-500 mb-2">💥 ¡CHOQUE!</h2>
-                  <p className="text-white/75 text-sm mb-4">¡Chocaste contra un obstáculo y tiraste todas las cajas!</p>
-                  
-                  <div className="bg-black/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-2 items-center justify-center">
-                    <div>
-                      <span className="text-white/40 text-xs font-bold uppercase tracking-wider block">Cajas Apiladas</span>
-                      <span className="text-yellow-400 font-mono font-black text-3xl">{currentScore} Pizzas</span>
-                    </div>
-                    <div className="h-px bg-white/10 w-full my-1" />
-                    <div>
-                      <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider block">🏆 Récord Personal</span>
-                      <span className="text-amber-500 font-mono font-extrabold text-lg">{highestScore} Pizzas</span>
-                    </div>
-                  </div>
-                </div>
+            {isDead && !gameState?.isRoundOver && (() => {
+              const qualifies = currentScore > 5 && (
+                localHighscores.length < 5 || currentScore > localHighscores[localHighscores.length - 1].score
+              );
+              
+              const saveScore = () => {
+                const cleanName = chefName.trim().substring(0, 10) || 'Chef';
+                const newScore = {
+                  name: cleanName,
+                  score: currentScore,
+                  date: new Date().toISOString().split('T')[0]
+                };
+                const updated = [...localHighscores, newScore]
+                  .sort((a, b) => b.score - a.score)
+                  .slice(0, 5);
+                setLocalHighscores(updated);
+                localStorage.setItem('pizza_hunter_local_highscores', JSON.stringify(updated));
+                setHasSavedRecord(true);
+              };
 
-                <div className="w-full flex flex-col gap-2.5">
-                  <button
-                    onClick={handleJoin}
-                    className="w-full py-4 bg-amber-500 text-neutral-950 font-black rounded-xl hover:bg-amber-400 active:scale-95 transition-all text-base tracking-wider"
-                  >
-                    VOLVER A REPARTIR
-                  </button>
-                  <button
-                    onClick={quitGame}
-                    className="w-full py-3 bg-white/5 text-white/80 font-bold rounded-xl hover:bg-white/10 active:scale-95 transition-all text-sm"
-                  >
-                    SALIR AL MENÚ
-                  </button>
-                </div>
-              </motion.div>
-            )}
+              return (
+                <motion.div
+                  initial={{ scale: 0.95, y: 15 }}
+                  animate={{ scale: 1, y: 0 }}
+                  className="bg-neutral-900/95 p-6 rounded-3xl border border-white/10 shadow-2xl max-w-sm w-full flex flex-col items-center gap-5 pointer-events-auto"
+                >
+                  <div className="text-center w-full">
+                    <h2 className="text-3xl font-black text-red-500 mb-1">💥 ¡CHOQUE!</h2>
+                    <p className="text-white/60 text-xs mb-3">Chocaste contra un obstáculo del restaurante</p>
+                    
+                    <div className="bg-black/40 border border-white/5 rounded-2xl p-3 flex justify-around items-center w-full mb-3">
+                      <div>
+                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block">Apiladas</span>
+                        <span className="text-yellow-400 font-mono font-black text-xl">{currentScore}</span>
+                      </div>
+                      <div className="w-px h-8 bg-white/10" />
+                      <div>
+                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block">🏆 Récord</span>
+                        <span className="text-amber-500 font-mono font-extrabold text-xl">{highestScore}</span>
+                      </div>
+                    </div>
+
+                    {qualifies && !hasSavedRecord ? (
+                      <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-3 flex flex-col gap-2.5 w-full text-left">
+                        <span className="text-amber-400 text-[10px] font-black font-mono tracking-wider uppercase block text-center">✨ ¡NUEVO RÉCORD LOCAL! ✨</span>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            value={chefName} 
+                            onChange={(e) => setChefName(e.target.value)} 
+                            maxLength={10}
+                            placeholder="Tu nombre..."
+                            className="flex-1 px-3 py-1.5 bg-black/40 border border-white/10 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                          />
+                          <button 
+                            onClick={saveScore}
+                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black rounded-lg text-xs tracking-wider transition-all"
+                          >
+                            GUARDAR
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Top 5 Leaderboard */
+                      <div className="bg-black/40 border border-white/5 rounded-2xl p-3.5 w-full text-left flex flex-col gap-1.5">
+                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-widest block text-center mb-1">🏆 TOP 5 REPARTIDORES 🏆</span>
+                        {localHighscores.map((entry, idx) => (
+                          <div key={idx} className="flex justify-between items-center text-xs font-mono">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold ${
+                                idx === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-neutral-800 text-white/50'
+                              }`}>{idx + 1}</span>
+                              <span className="text-white font-bold">{entry.name}</span>
+                            </div>
+                            <span className="text-amber-400 font-extrabold">{entry.score} cajas</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="w-full flex flex-col gap-2">
+                    <button
+                      onClick={handleJoin}
+                      className="w-full py-3 bg-amber-500 text-neutral-950 font-black rounded-xl hover:bg-amber-400 active:scale-95 transition-all text-sm tracking-wider"
+                    >
+                      VOLVER A REPARTIR
+                    </button>
+                    <button
+                      onClick={quitGame}
+                      className="w-full py-2.5 bg-white/5 text-white/80 font-bold rounded-xl hover:bg-white/10 active:scale-95 transition-all text-xs"
+                    >
+                      SALIR AL MENÚ
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })()}
 
             {/* MAIN MENU / LANDING PAGE */}
             {!gameState && !isInLobby && (
@@ -841,13 +919,23 @@ export function UI() {
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => setShowConfigModal(true)}
-                      className="w-full md:w-64 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-black rounded-2xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-3 border-t border-white/20 shadow-2xl shadow-amber-500/20 group cursor-pointer"
-                    >
-                      <span>JUGAR AHORA</span>
-                      <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-fit z-10">
+                      <button
+                        onClick={() => setShowConfigModal(true)}
+                        className="w-full sm:w-52 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-black rounded-2xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-2 border-t border-white/20 shadow-2xl shadow-amber-500/20 group cursor-pointer"
+                      >
+                        <span>JUGAR AHORA</span>
+                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                      </button>
+
+                      <button
+                        onClick={() => setShowHighscoresModal(true)}
+                        className="w-full sm:w-44 py-4 bg-neutral-900 border border-white/10 hover:bg-neutral-800 text-white font-bold rounded-2xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Award size={18} className="text-yellow-500" />
+                        <span>RÉCORDS</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Right Column: Vespa Showcase with platform */}
@@ -1006,6 +1094,63 @@ export function UI() {
                   >
                     <span>¡INICIAR ENTRADAS!</span>
                     <ArrowRight size={18} />
+                  </button>
+                </motion.div>
+              </div>
+            )}
+
+            {/* HIGHSCORES MODAL */}
+            {!gameState && !isInLobby && showHighscoresModal && (
+              <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-auto">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  onClick={() => setShowHighscoresModal(false)}
+                  className="absolute inset-0 bg-black/75 backdrop-blur-md cursor-pointer"
+                />
+
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="bg-neutral-900 border border-white/10 rounded-3xl p-6 md:p-8 max-w-sm w-full relative z-10 flex flex-col gap-5 shadow-2xl overflow-y-auto max-h-[95vh]"
+                >
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-black text-amber-500 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Award size={16} className="text-yellow-500" />
+                      Salón de la Fama
+                    </h3>
+                    <button
+                      onClick={() => setShowHighscoresModal(false)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  <div className="bg-black/40 border border-white/5 rounded-2xl p-4 w-full text-left flex flex-col gap-2.5">
+                    {localHighscores.map((entry, idx) => (
+                      <div key={idx} className="flex justify-between items-center text-sm font-mono border-b border-white/5 pb-2 last:border-0 last:pb-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold ${
+                            idx === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                            idx === 1 ? 'bg-white/10 text-white/70' :
+                            idx === 2 ? 'bg-amber-800/20 text-amber-600' : 'bg-neutral-800 text-white/40'
+                          }`}>{idx + 1}</span>
+                          <span className="text-white font-extrabold">{entry.name}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-amber-400 font-extrabold text-sm">{entry.score} pizzas</span>
+                          <span className="text-[8px] text-white/20">{entry.date}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setShowHighscoresModal(false)}
+                    className="w-full py-3 bg-white/5 text-white/80 font-bold rounded-xl hover:bg-white/10 active:scale-95 transition-all text-xs cursor-pointer"
+                  >
+                    CERRAR
                   </button>
                 </motion.div>
               </div>

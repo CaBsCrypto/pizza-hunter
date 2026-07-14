@@ -630,20 +630,27 @@ function InstancedTables({ clothTexture }: { clothTexture: THREE.CanvasTexture }
 }
 
 
-function MovingObstacle({ config }: { config: MovingObstacleConfig }) {
+function MovingObstacle({ config, positionsRef }: { config: MovingObstacleConfig; positionsRef: React.RefObject<Record<string, {x: number, y: number, angle: number}>> }) {
   const ref = useRef<THREE.Group>(null);
   const trayRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
     if (!ref.current) return;
-    const time = Date.now() / 1000;
-    const angle = time * config.speed;
-    const x = config.cx + Math.cos(angle) * config.patrolRadius;
-    const y = config.cy + Math.sin(angle) * config.patrolRadius;
-    
-    ref.current.position.set(x, y, 0);
-    ref.current.rotation.set(0, 0, angle + Math.PI / 2);
+    const pos = positionsRef.current?.[config.id];
+    if (pos) {
+      ref.current.position.set(pos.x, pos.y, 0);
+      ref.current.rotation.set(0, 0, pos.angle);
+    } else {
+      // Fallback
+      const time = Date.now() / 1000;
+      const angle = time * config.speed;
+      const x = config.cx + Math.cos(angle) * config.patrolRadius;
+      const y = config.cy + Math.sin(angle) * config.patrolRadius;
+      ref.current.position.set(x, y, 0);
+      ref.current.rotation.set(0, 0, angle + Math.PI / 2);
+    }
 
+    const time = Date.now() / 1000;
     if (config.type === 'waiter') {
       ref.current.position.z = Math.abs(Math.sin(time * 8)) * 0.15;
       if (trayRef.current) {
@@ -1306,6 +1313,8 @@ function Orbs({ pizzaTexture }: { pizzaTexture: THREE.CanvasTexture }) {
 
 export function GameScene() {
   const { gameState, playerId, sendPlayerState, sendCollectOrb, isSolo } = useGameStore();
+  const mobPhasesRef = useRef<Record<string, number>>({});
+  const mobPositionsRef = useRef<Record<string, {x: number, y: number, angle: number}>>({});
   const { camera } = useThree();
   const { pollInputs } = useGameInput({
     onShoot: () => firePizza(),
@@ -1994,6 +2003,43 @@ export function GameScene() {
     const gs = globalGameState.current;
     if (!gs || !playerId) return;
 
+    // --- ACCUMULATIVE OBSTACLE PHYSICS (SINGLEPLAYER DIFFICULTY & PURSUIT) ---
+    const playerScore = localPlayerRef.current?.score || 5;
+    const speedMultiplier = isSolo ? (1 + Math.max(0, playerScore - 5) * 0.015) : 1;
+
+    MOVING_OBSTACLES_CONFIGS.forEach((cfg) => {
+      if (mobPhasesRef.current[cfg.id] === undefined) {
+        mobPhasesRef.current[cfg.id] = (Date.now() / 1000) * cfg.speed;
+      }
+      mobPhasesRef.current[cfg.id] += delta * cfg.speed * speedMultiplier;
+
+      const angle = mobPhasesRef.current[cfg.id];
+      let targetX = cfg.cx + Math.cos(angle) * cfg.patrolRadius;
+      let targetY = cfg.cy + Math.sin(angle) * cfg.patrolRadius;
+
+      // Roombas of Pursuit if score > 25
+      if (isSolo && playerScore > 25 && cfg.type === 'roomba' && localPlayerRef.current?.active) {
+        const playerPos = localPlayerRef.current.segments[0];
+        const prev = mobPositionsRef.current[cfg.id] || { x: targetX, y: targetY };
+        const dx = playerPos.x - prev.x;
+        const dy = playerPos.y - prev.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 1.5) {
+          // Pursue player at 4.0 units/sec
+          const speed = 4.0;
+          targetX = prev.x + (dx / dist) * speed * delta;
+          targetY = prev.y + (dy / dist) * speed * delta;
+        }
+      }
+
+      mobPositionsRef.current[cfg.id] = {
+        x: targetX,
+        y: targetY,
+        angle: angle + Math.PI / 2
+      };
+    });
+
     if (gs.isRoundOver) {
       inputs.current = { left: false, right: false, boost: false };
     }
@@ -2065,11 +2111,13 @@ export function GameScene() {
         // Moving obstacle collision check (Waiters and Roombas)
         let movingCollided = false;
         if (!isInvincible) {
-          const currentMovingObstacles = getMovingObstacles(Date.now() / 1000);
-          for (const mob of currentMovingObstacles) {
-            const dx = head.x - mob.x;
-            const dy = head.y - mob.y;
-            if (dx * dx + dy * dy < (mob.radius + 0.6) * (mob.radius + 0.6)) {
+          for (const cfg of MOVING_OBSTACLES_CONFIGS) {
+            const mobPos = mobPositionsRef.current[cfg.id];
+            if (!mobPos) continue;
+            const dx = head.x - mobPos.x;
+            const dy = head.y - mobPos.y;
+            const radius = cfg.type === 'waiter' ? 1.4 : 1.0;
+            if (dx * dx + dy * dy < (radius + 0.6) * (radius + 0.6)) {
               movingCollided = true;
               break;
             }
@@ -2275,6 +2323,7 @@ export function GameScene() {
         <MovingObstacle 
           key={mob.id}
           config={mob}
+          positionsRef={mobPositionsRef}
         />
       ))}
 

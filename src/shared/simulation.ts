@@ -548,7 +548,7 @@ export function stepBotAI(
   const now = env.now();
   const head = bot.segments[0];
 
-  // objetivo: pizza más cercana
+  // 1. OBJETIVO: Pizza más cercana (Con preferencia de ítems valiosos para Wario y Mario)
   let nearest: Orb | null = null;
   let minDistSq = Infinity;
   for (const oid in state.orbs) {
@@ -556,15 +556,22 @@ export function stepBotAI(
     const dx = orb.x - head.x;
     const dy = orb.y - head.y;
     const d = dx * dx + dy * dy;
-    if (d < minDistSq) {
-      minDistSq = d;
+    
+    // El bot-0 (Mario/Velocista) y bot-2 (Wario/Defensivo) valoran más los escudos u orbes valiosos
+    const isSpecial = orb.value > 1 || oid.startsWith('shield');
+    const weight = ((bot.id === 'bot-0' || bot.id === 'bot-2') && isSpecial && d < 1200) ? 0.3 : 1.0;
+    const weightedD = d * weight;
+    
+    if (weightedD < minDistSq) {
+      minDistSq = weightedD;
       nearest = orb;
     }
   }
 
-  // disparo a rival en línea
+  // 2. DISPARO A RIVAL EN LÍNEA (El bot-1 Cacciatore dispara un 30% más rápido)
   if (!bot.lastShootTime) bot.lastShootTime = 0;
-  if (now - bot.lastShootTime > C.BOT_SHOOT_COOLDOWN_MS) {
+  const shootCooldown = bot.id === 'bot-1' ? (C.BOT_SHOOT_COOLDOWN_MS * 0.7) : C.BOT_SHOOT_COOLDOWN_MS;
+  if (now - bot.lastShootTime > shootCooldown) {
     let target: Player | null = null;
     let bestSq = C.BOT_SHOOT_RANGE_SQ;
     for (const otherId in state.players) {
@@ -590,33 +597,62 @@ export function stepBotAI(
     }
   }
 
-  // dirección hacia la pizza
-  if (nearest) {
+  // 3. SELECCIÓN DE RUMBO
+  // El bot-1 (Luigi/Cacciatore) prioriza perseguir y embestir al rival más cercano si está a menos de 20 metros
+  let huntTarget: Player | null = null;
+  if (bot.id === 'bot-1') {
+    let bestDistSq = 400; // 20 metros de rango de caza
+    for (const otherId in state.players) {
+      if (otherId === bot.id) continue;
+      const other = state.players[otherId];
+      if (other.state !== 'alive') continue;
+      const oh = other.segments[0];
+      if (!oh) continue;
+      const dx = oh.x - head.x;
+      const dy = oh.y - head.y;
+      const dSq = dx * dx + dy * dy;
+      if (dSq < bestDistSq) {
+        bestDistSq = dSq;
+        huntTarget = other;
+      }
+    }
+  }
+
+  if (huntTarget && bot.id === 'bot-1') {
+    const targetHead = huntTarget.segments[0];
+    const diff = wrapAngle(Math.atan2(targetHead.y - head.y, targetHead.x - head.x) - bot.currentAngle);
+    const maxTurn = TURN_SPEED * dt * C.BOT_TURN_FACTOR * 1.2; // Gira un poco más rápido persiguiendo
+    bot.currentAngle += Math.max(-maxTurn, Math.min(maxTurn, diff));
+  } else if (nearest) {
     const diff = wrapAngle(Math.atan2(nearest.y - head.y, nearest.x - head.x) - bot.currentAngle);
     const maxTurn = TURN_SPEED * dt * C.BOT_TURN_FACTOR;
     bot.currentAngle += Math.max(-maxTurn, Math.min(maxTurn, diff));
   }
 
-  // evasión de mesas
+  // 4. EVASIÓN DE MESAS (El bot-2 Wario esquiva con mayor margen de anticipación)
+  const avoidPad = bot.id === 'bot-2' ? (C.BOT_TABLE_AVOID_PAD + 1.2) : C.BOT_TABLE_AVOID_PAD;
   for (const t of tables) {
     const dx = head.x - t.x;
     const dy = head.y - t.y;
-    const avoid = t.radius + C.BOT_TABLE_AVOID_PAD;
+    const avoid = t.radius + avoidPad;
     if (dx * dx + dy * dy < avoid * avoid) {
       const diff = wrapAngle(Math.atan2(dy, dx) - bot.currentAngle);
       bot.currentAngle += diff * C.BOT_TABLE_AVOID_BLEND;
     }
   }
 
-  // evasión de muros
-  const limit = WORLD_SIZE / 2 - C.BOT_WALL_AVOID_MARGIN;
+  // 5. EVASIÓN DE MUROS (El bot-2 Wario dobla antes cerca del borde del mapa)
+  const avoidMargin = bot.id === 'bot-2' ? (C.BOT_WALL_AVOID_MARGIN + 2.5) : C.BOT_WALL_AVOID_MARGIN;
+  const limit = WORLD_SIZE / 2 - avoidMargin;
   if (Math.abs(head.x) > limit || Math.abs(head.y) > limit) {
     const diff = wrapAngle(Math.atan2(-head.y, -head.x) - bot.currentAngle);
     bot.currentAngle += diff * C.BOT_WALL_AVOID_BLEND;
   }
 
-  // decisión de boost
-  if (bot.score > C.BOT_BOOST_MIN_SCORE && env.random() < C.BOT_BOOST_TOGGLE_CHANCE) {
+  // 6. DECISIÓN DE BOOST (El bot-0 Mario/Velocista usa nitro mucho más a menudo)
+  const boostChance = bot.id === 'bot-0' ? 0.15 : C.BOT_BOOST_TOGGLE_CHANCE;
+  const minScore = bot.id === 'bot-0' ? 6 : C.BOT_BOOST_MIN_SCORE;
+  if (bot.score > minScore && env.random() < boostChance) {
     bot.isBoosting = !bot.isBoosting;
   }
   if (bot.score <= C.BOOST_MIN_SCORE) bot.isBoosting = false;

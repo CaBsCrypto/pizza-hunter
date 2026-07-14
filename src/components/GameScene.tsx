@@ -76,12 +76,11 @@ export function ChefModel({ color, isUI = false }: { color: string; isUI?: boole
     return clone;
   }, [scene, color]);
 
-  // Adjust model orientation: GLTF (Y-up, -Z forward) -> Game (Z-up, +X forward)
-  // For UI: Keep it Y-up and scale up to 1.2 for prominent showcase.
-  // For Game: Lay it flat on the XY plane at 1.35 scale (much bigger to match gameplay bounds).
-  const rotation = isUI ? [0, 0, 0] : [Math.PI / 2, 0, -Math.PI / 2];
+  // Adjust model orientation: Since the Tripo GLB is already Z-up natively:
+  // For UI: Rotate 90 degrees on X [Math.PI / 2, 0, 0] to translate Z-up to Y-up (stands upright).
+  // For Game: Keep X/Y rotation at 0 and only rotate Z by -Math.PI / 2 to face forward in the Z-up arena.
+  const rotation = isUI ? [Math.PI / 2, 0, 0] : [0, 0, -Math.PI / 2];
   const scale = isUI ? [1.2, 1.2, 1.2] : [1.35, 1.35, 1.35];
-  // Since model base is at Y=0 locally, we place it slightly above floor level in game
   const position = isUI ? [0, -0.3, 0] : [0, 0, 0.1];
 
   return (

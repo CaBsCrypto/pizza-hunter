@@ -44,15 +44,13 @@ function RotatingChef({ color }: { color: string }) {
   useFrame((state) => {
     if (groupRef.current) {
       groupRef.current.rotation.y = state.clock.getElapsedTime() * 0.95;
-      groupRef.current.position.y = -0.3 + Math.sin(state.clock.getElapsedTime() * 2.2) * 0.035;
+      groupRef.current.position.y = -0.15 + Math.sin(state.clock.getElapsedTime() * 2.2) * 0.035;
     }
   });
 
   return (
     <group ref={groupRef}>
-      <group rotation={[-Math.PI / 2, 0, 0]}>
-        <ChefModel color={color} isUI={true} />
-      </group>
+      <ChefModel color={color} isUI={true} />
     </group>
   );
 }
@@ -70,7 +68,7 @@ function ChefPreview3D({ color }: { color: string }) {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-amber-500/5 rounded-full blur-3xl group-hover:bg-amber-500/10 transition-all duration-700" />
 
       <Canvas
-        camera={{ position: [0, 0.8, 2.2], fov: 45 }}
+        camera={{ position: [0, 0.42, 1.62], fov: 45 }}
         style={{ width: '100%', height: '100%' }}
       >
         <ambientLight intensity={1.8} />
@@ -87,7 +85,7 @@ function VespaShowcase({ color }: { color: string }) {
     <div className="w-full h-[200px] md:h-[380px] relative overflow-hidden flex items-center justify-center pointer-events-auto">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl" />
       <Canvas
-        camera={{ position: [0, 0.7, 2.1], fov: 40 }}
+        camera={{ position: [0, 0.35, 1.55], fov: 40 }}
         style={{ width: '100%', height: '100%', background: 'transparent' }}
       >
         <ambientLight intensity={2.2} />

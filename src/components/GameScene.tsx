@@ -11,6 +11,7 @@ import { WORLD_SIZE, TURN_SPEED, BOOST_SPEED, BASE_SPEED, getTables, getMovingOb
 import { playPizzaCollectSound, playCrashSound, playShieldCollectSound, playShieldPopSound, playPizzaShootSound } from '../utils/audio';
 import { useGameInput } from '../hooks/useGameInput';
 import * as THREE from 'three';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 const localCollectedOrbs = new Set<string>();
 const tablesList = getTables();
@@ -42,7 +43,7 @@ export function ChefModel({ color, isUI = false }: { color: string; isUI?: boole
   
   // Clone the scene for instanced/multi-player rendering
   const clonedScene = useMemo(() => {
-    const clone = scene.clone();
+    const clone = SkeletonUtils.clone(scene);
     
     // Traversal to enable shadow map projections and customize materials
     clone.traverse((child: any) => {
@@ -78,8 +79,8 @@ export function ChefModel({ color, isUI = false }: { color: string; isUI?: boole
 
   // Adjust model orientation: Since the Tripo GLB is Y-up natively:
   // For UI (Y-up canvas): Keep rotation at [0, 0, 0] so it stands upright on its wheels naturally.
-  // For Game (Z-up top-down with 2D profile view): Rotate 90deg on Y [0, -Math.PI / 2, 0] to align wheels flat with screen plane.
-  const rotation = isUI ? [0, 0, 0] : [0, -Math.PI / 2, 0];
+  // For Game (Z-up top-down with 2D profile view): Rotate 90deg on X and -90deg on Z to align wheels flat and upright with screen plane.
+  const rotation = isUI ? [0, 0, 0] : [Math.PI / 2, 0, -Math.PI / 2];
   const scale = isUI ? [0.97, 0.97, 0.97] : [1.09, 1.09, 1.09];
   const position = isUI ? [0, -0.3, 0] : [0, 0, 0.1];
 

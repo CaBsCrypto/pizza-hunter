@@ -79,10 +79,10 @@ export function ChefModel({ color, isUI = false }: { color: string; isUI?: boole
 
   // Adjust model orientation: Since the Tripo GLB is Y-up natively:
   // For UI (Y-up canvas): Keep rotation at [0, 0, 0] so it stands upright on its wheels naturally.
-  // For Game (Z-up top-down): Rotate 90deg on X to stand upright on wheels, and 90deg on Z to face forward (+X).
-  const rotation = isUI ? [0, 0, 0] : [Math.PI / 2, 0, Math.PI / 2];
-  const scale = isUI ? [0.97, 0.97, 0.97] : [1.09, 1.09, 1.09];
-  const position = isUI ? [0, -0.3, 0] : [0, 0, 0.1];
+  // For Game (Z-up top-down): Rotate -90deg on Y and -90deg on Z to stand upright on wheels facing forward correctly.
+  const rotation = isUI ? [0, 0, 0] : [0, -Math.PI / 2, -Math.PI / 2];
+  const scale = isUI ? [0.97, 0.97, 0.97] : [2.05, 2.05, 2.05];
+  const position = isUI ? [0, -0.3, 0] : [0, 0, -0.3];
 
   return (
     <group rotation={rotation as any} scale={scale as any} position={position as any}>
@@ -547,8 +547,9 @@ function PizzeriaWalls() {
 function Snake({ playerId, color, isLocal, boxTexture }: { playerId: string, color: string, isLocal: boolean, boxTexture: THREE.CanvasTexture }) {
   const bodyRef = useRef<THREE.InstancedMesh>(null);
   const headRef = useRef<THREE.Group>(null);
-  const shieldVisualRef = useRef<THREE.Mesh>(null);
   const boostFlameRef = useRef<THREE.Mesh>(null);
+  const shieldVisualRef = useRef<THREE.Mesh>(null);
+  const headlightRef = useRef<THREE.SpotLight>(null);
   const trailMeshRef = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const currentPositions = useRef<{x: number, y: number}[]>([]);
@@ -749,6 +750,24 @@ function Snake({ playerId, color, isLocal, boxTexture }: { playerId: string, col
     <group>
       <group ref={headRef} scale={[2.1, 2.1, 2.1]}>
         <ChefModel color={color} />
+        {/* Cozy Warm Headlight Beam */}
+        <object3D position={[3.0, 0, 0.1]} ref={(el) => {
+          if (el && headlightRef.current) {
+            headlightRef.current.target = el;
+          }
+        }} />
+        <spotLight
+          ref={headlightRef}
+          castShadow
+          intensity={70.0}
+          distance={14}
+          angle={Math.PI / 4}
+          penumbra={0.7}
+          position={[0.4, 0, 0.15]}
+          color="#fff4dd"
+          shadow-mapSize={[512, 512]}
+          shadow-bias={-0.0005}
+        />
         <mesh ref={boostFlameRef} position={[-0.5, 0, 0.25]} rotation={[0, -Math.PI / 2, 0]}>
           <coneGeometry args={[0.3, 0.8, 8]} />
           <meshStandardMaterial
@@ -1920,28 +1939,28 @@ export function GameScene() {
             });
             localPlayerRef.current.lastSendTime = now;
           }
-        }
 
-        // Apply smooth 3D isometric follow camera (Y offset -12, Z offset 12)
-        const lerpSpeedX = 10 * delta;
-        const lerpSpeedY = 10 * delta;
-        const lerpSpeedZ = 4 * delta;
-        
-        const targetCamX = head.x;
-        const targetCamY = head.y - 12;
-        const targetCamZ = 12;
+          // Smoothly move the base camera position toward target (top-down view)
+          const lerpSpeedX = 10 * delta;
+          const lerpSpeedY = 10 * delta;
+          const lerpSpeedZ = 4 * delta;
+          
+          // Restore original camera target calculation for flat cenital view
+          camera.position.x += (cameraTarget.current.x - camera.position.x) * lerpSpeedX;
+          camera.position.y += (cameraTarget.current.y - camera.position.y) * lerpSpeedY;
+          camera.position.z += (cameraTarget.current.z - camera.position.z) * lerpSpeedZ;
 
-        camera.position.x += (targetCamX - camera.position.x) * lerpSpeedX;
-        camera.position.y += (targetCamY - camera.position.y) * lerpSpeedY;
-        camera.position.z += (targetCamZ - camera.position.z) * lerpSpeedZ;
+          // Restore default camera up vector (Y-up for flat 2D top-down layout)
+          camera.up.set(0, 1, 0);
 
-        // Focus camera on the 3D position of the player's head
-        camera.lookAt(head.x, head.y, 0.5);
+          // Focus camera straight down
+          camera.lookAt(camera.position.x, camera.position.y, 0);
 
-        // Keep shadows sharp by following the player with the light
-        if (lightRef.current && lightTarget) {
-          lightRef.current.position.set(camera.position.x + 10, camera.position.y - 10, 30);
-          lightTarget.position.set(camera.position.x, camera.position.y, 0);
+          // Keep shadows sharp by following the player with the light
+          if (lightRef.current && lightTarget) {
+            lightRef.current.position.set(camera.position.x + 10, camera.position.y - 10, 30);
+            lightTarget.position.set(camera.position.x, camera.position.y, 0);
+          }
         }
       }
     } else {
@@ -1953,14 +1972,14 @@ export function GameScene() {
 
   return (
     <>
-      <ambientLight intensity={0.6} />
+      <ambientLight intensity={0.35} />
       
       {/* Warm pizzeria ambient lighting */}
       <directionalLight
         ref={lightRef}
         target={lightTarget}
         castShadow
-        intensity={1.8}
+        intensity={2.8}
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-25}
         shadow-camera-right={25}

@@ -750,24 +750,26 @@ function Snake({ playerId, color, isLocal, boxTexture }: { playerId: string, col
     <group>
       <group ref={headRef} scale={[2.1, 2.1, 2.1]}>
         <ChefModel color={color} />
-        {/* Cozy Warm Headlight Beam */}
-        <object3D position={[3.0, 0, 0.1]} ref={(el) => {
-          if (el && headlightRef.current) {
-            headlightRef.current.target = el;
-          }
-        }} />
-        <spotLight
-          ref={headlightRef}
-          castShadow
-          intensity={70.0}
-          distance={14}
-          angle={Math.PI / 4}
-          penumbra={0.7}
-          position={[0.4, 0, 0.15]}
-          color="#fff4dd"
-          shadow-mapSize={[512, 512]}
-          shadow-bias={-0.0005}
-        />
+        {/* Cozy Warm Headlight Beam (Only rendered for the local player to save massive mobile performance) */}
+        {isLocal && (
+          <>
+            <object3D position={[3.0, 0, 0.1]} ref={(el) => {
+              if (el && headlightRef.current) {
+                headlightRef.current.target = el;
+              }
+            }} />
+            <spotLight
+              ref={headlightRef}
+              castShadow={false}
+              intensity={70.0}
+              distance={14}
+              angle={Math.PI / 4}
+              penumbra={0.7}
+              position={[0.4, 0, 0.15]}
+              color="#fff4dd"
+            />
+          </>
+        )}
         <mesh ref={boostFlameRef} position={[-0.5, 0, 0.25]} rotation={[0, -Math.PI / 2, 0]}>
           <coneGeometry args={[0.3, 0.8, 8]} />
           <meshStandardMaterial
@@ -995,6 +997,9 @@ function Orbs({ pizzaTexture }: { pizzaTexture: THREE.CanvasTexture }) {
 }
 
 export function GameScene() {
+  const isMobile = useMemo(() => {
+    return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
+  }, []);
   const { gameState, playerId, sendPlayerState, sendCollectOrb, isSolo } = useGameStore();
   const mobPhasesRef = useRef<Record<string, number>>({});
   const mobPositionsRef = useRef<Record<string, {x: number, y: number, angle: number}>>({});
@@ -1980,7 +1985,7 @@ export function GameScene() {
         target={lightTarget}
         castShadow
         intensity={2.8}
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={isMobile ? [512, 512] : [1024, 1024]}
         shadow-camera-left={-25}
         shadow-camera-right={25}
         shadow-camera-top={25}

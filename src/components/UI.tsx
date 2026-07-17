@@ -260,9 +260,36 @@ export function UI() {
     };
   }, [playerId, isInLobby, isDead, gameState?.isRoundOver, lobbyInfo, handleJoin, startGameNow]);
 
+  // Instant retry keydown shortcut (Space, Enter, R) when dead or round over
+  useEffect(() => {
+    if (!isDead && !gameState?.isRoundOver) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if typing inside an input element
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        return;
+      }
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        handleJoin();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDead, gameState?.isRoundOver, handleJoin]);
+
   const [showTimeExpiredScreen, setShowTimeExpiredScreen] = useState(false);
   const lastPlayedSecond = useRef<number | null>(null);
   const wasRoundOver = useRef<boolean>(false);
+  const matchStartTime = useRef<number>(Date.now());
+
+  // Track match start time to calculate survival duration
+  useEffect(() => {
+    if (isAlive) {
+      matchStartTime.current = Date.now();
+    }
+  }, [isAlive]);
 
   // Sound and transition logic for round timer expiry
   useEffect(() => {
@@ -792,31 +819,54 @@ export function UI() {
                 setHasSavedRecord(true);
               };
 
+              const survivalSecs = Math.max(1, Math.floor((Date.now() - matchStartTime.current) / 1000));
+
               return (
                 <motion.div
-                  initial={{ scale: 0.95, y: 15 }}
-                  animate={{ scale: 1, y: 0 }}
-                  className="bg-neutral-900/95 p-6 rounded-3xl border border-white/10 shadow-2xl max-w-sm w-full flex flex-col items-center gap-5 pointer-events-auto"
+                  initial={{ scale: 0.9, y: 20, opacity: 0 }}
+                  animate={{ scale: 1, y: 0, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="bg-neutral-900/95 p-6 md:p-7 rounded-3xl border border-red-500/30 shadow-2xl shadow-red-500/10 max-w-md w-full flex flex-col items-center gap-5 pointer-events-auto relative overflow-hidden"
                 >
-                  <div className="text-center w-full">
-                    <h2 className="text-3xl font-black text-red-500 mb-1">💥 ¡CHOQUE!</h2>
-                    <p className="text-white/60 text-xs mb-3">Chocaste contra un obstáculo del restaurante</p>
+                  {/* Glowing background aura */}
+                  <div className="absolute -top-24 -left-24 w-48 h-48 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                  <div className="text-center w-full relative z-10">
+                    <motion.div
+                      initial={{ rotate: -15, scale: 0.5 }}
+                      animate={{ rotate: 0, scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 300 }}
+                      className="inline-block text-4xl mb-1"
+                    >
+                      💥
+                    </motion.div>
+                    <h2 className="text-3xl font-black text-red-500 tracking-tight uppercase" style={{ textShadow: '0 0 15px rgba(239, 68, 68, 0.4)' }}>
+                      ¡ACCIDENTE EN LA PIZZERÍA!
+                    </h2>
+                    <p className="text-white/60 text-xs mt-1">Chocaste contra un obstáculo de la arena</p>
                     
-                    <div className="bg-black/40 border border-white/5 rounded-2xl p-3 flex justify-around items-center w-full mb-3">
-                      <div>
-                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block">Apiladas</span>
+                    {/* 3-Column Stats Card Grid */}
+                    <div className="grid grid-cols-3 gap-2 bg-black/50 border border-white/10 rounded-2xl p-3 w-full my-4">
+                      <div className="flex flex-col items-center justify-center p-1.5">
+                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block mb-0.5">Apiladas</span>
                         <span className="text-yellow-400 font-mono font-black text-xl">{currentScore}</span>
                       </div>
-                      <div className="w-px h-8 bg-white/10" />
-                      <div>
-                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block">🏆 Récord</span>
-                        <span className="text-amber-500 font-mono font-extrabold text-xl">{highestScore}</span>
+                      
+                      <div className="flex flex-col items-center justify-center p-1.5 border-x border-white/10">
+                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block mb-0.5">Tiempo</span>
+                        <span className="text-emerald-400 font-mono font-extrabold text-xl">{survivalSecs}s</span>
+                      </div>
+
+                      <div className="flex flex-col items-center justify-center p-1.5">
+                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block mb-0.5">🏆 Récord</span>
+                        <span className="text-amber-400 font-mono font-extrabold text-xl">{Math.max(highestScore, currentScore)}</span>
                       </div>
                     </div>
 
                     {qualifies && !hasSavedRecord ? (
-                      <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-3 flex flex-col gap-2.5 w-full text-left">
-                        <span className="text-amber-400 text-[10px] font-black font-mono tracking-wider uppercase block text-center">✨ ¡NUEVO RÉCORD LOCAL! ✨</span>
+                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5 flex flex-col gap-2.5 w-full text-left">
+                        <span className="text-amber-400 text-[10px] font-black font-mono tracking-wider uppercase block text-center animate-pulse">✨ ¡NUEVO RÉCORD DE APILAMIENTO! ✨</span>
                         <div className="flex gap-2">
                           <input 
                             type="text" 
@@ -824,18 +874,18 @@ export function UI() {
                             onChange={(e) => setChefName(e.target.value)} 
                             maxLength={10}
                             placeholder="Tu nombre..."
-                            className="flex-1 px-3 py-1.5 bg-black/40 border border-white/10 rounded-lg text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                            className="flex-1 px-3 py-2 bg-black/60 border border-amber-500/40 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-amber-400"
                           />
                           <button 
                             onClick={saveScore}
-                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black rounded-lg text-xs tracking-wider transition-all"
+                            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black rounded-xl text-xs tracking-wider transition-all shadow-md active:scale-95"
                           >
                             GUARDAR
                           </button>
                         </div>
                       </div>
                     ) : (
-                      /* Top 5 Leaderboard */
+                      /* Top 5 Local Highscores */
                       <div className="bg-black/40 border border-white/5 rounded-2xl p-3.5 w-full text-left flex flex-col gap-1.5">
                         <span className="text-white/40 text-[9px] font-bold uppercase tracking-widest block text-center mb-1">🏆 TOP 5 REPARTIDORES 🏆</span>
                         {localHighscores.map((entry, idx) => (
@@ -853,18 +903,25 @@ export function UI() {
                     )}
                   </div>
 
-                  <div className="w-full flex flex-col gap-2">
+                  {/* Actions */}
+                  <div className="w-full flex flex-col gap-2.5 relative z-10">
                     <button
                       onClick={handleJoin}
-                      className="w-full py-3 bg-amber-500 text-neutral-950 font-black rounded-xl hover:bg-amber-400 active:scale-95 transition-all text-sm tracking-wider"
+                      className="w-full py-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-neutral-950 font-black rounded-2xl hover:brightness-110 active:scale-95 transition-all text-base tracking-wider shadow-lg shadow-amber-500/25 border border-yellow-300/40 relative overflow-hidden group flex flex-col items-center justify-center gap-0.5"
                     >
-                      VOLVER A REPARTIR
+                      <span className="flex items-center gap-2 font-black text-sm md:text-base uppercase tracking-wider">
+                        <Zap size={18} className="text-neutral-950 fill-neutral-950 animate-pulse" />
+                        ¡REVANCHA INSTANTÁNEA!
+                      </span>
+                      <span className="text-[9px] text-neutral-900/80 font-mono font-bold tracking-widest uppercase">
+                        (Presiona ESPACIO, ENTER o A)
+                      </span>
                     </button>
                     <button
                       onClick={quitGame}
-                      className="w-full py-2.5 bg-white/5 text-white/80 font-bold rounded-xl hover:bg-white/10 active:scale-95 transition-all text-xs"
+                      className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-bold rounded-xl active:scale-95 transition-all text-xs border border-white/5"
                     >
-                      SALIR AL MENÚ
+                      SALIR AL MENÚ PRINCIPAL
                     </button>
                   </div>
                 </motion.div>

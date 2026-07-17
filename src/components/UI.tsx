@@ -22,8 +22,11 @@ import {
   Award,
   Flame,
   ChevronDown,
-  X
+  X,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
+import { toggleMuteAudio, getIsMuted } from '../utils/audioSynthesizer';
 import { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
@@ -157,6 +160,7 @@ export function UI() {
   });
 
   const [gamepadConnected, setGamepadConnected] = useState(false);
+  const [isMutedState, setIsMutedState] = useState<boolean>(() => getIsMuted());
 
   const currentScore = player ? Math.floor(player.score) : 0;
 
@@ -477,6 +481,18 @@ export function UI() {
         </div>
 
         <div className="flex items-center gap-2 z-10">
+          <button
+            onClick={() => {
+              const muted = toggleMuteAudio();
+              setIsMutedState(muted);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white text-xs font-bold transition-all shadow-lg active:scale-95 border border-white/5"
+            title={isMutedState ? "Activar Sonido" : "Silenciar Sonido"}
+          >
+            {isMutedState ? <VolumeX size={15} className="text-red-400" /> : <Volume2 size={15} className="text-amber-400" />}
+            <span className="hidden sm:inline text-xs font-mono">{isMutedState ? "MUTE" : "AUDIO"}</span>
+          </button>
+
           <button
             onClick={handleOpenNewTab}
             className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white text-sm font-bold transition-colors shadow-lg"

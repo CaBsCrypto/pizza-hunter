@@ -9,6 +9,7 @@ import { useGLTF } from '@react-three/drei';
 import { useGameStore, globalGameState } from '../store/gameStore';
 import { WORLD_SIZE, TURN_SPEED, BOOST_SPEED, BASE_SPEED, getTables, getMovingObstacles, MOVING_OBSTACLES_CONFIGS, MovingObstacleConfig } from '../shared/types';
 import { playPizzaCollectSound, playCrashSound, playShieldCollectSound, playShieldPopSound, playPizzaShootSound } from '../utils/audio';
+import { updateEngineSound, stopEngineSound, playPickupSound, playCrashSound as playCrashSynthSound, playShieldEatSound } from '../utils/audioSynthesizer';
 import { useGameInput } from '../hooks/useGameInput';
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -996,6 +997,130 @@ function Orbs({ pizzaTexture }: { pizzaTexture: THREE.CanvasTexture }) {
   );
 }
 
+interface FlyingBoxParticle {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  rotX: number;
+  rotY: number;
+  rotZ: number;
+  vRotX: number;
+  vRotY: number;
+  vRotZ: number;
+  life: number;
+  decay: number;
+}
+
+function FlyingBoxesSystem({ boxTexture }: { boxTexture: THREE.CanvasTexture }) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const boxesRef = useRef<FlyingBoxParticle[]>([]);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  const boxMaterials = useMemo(() => {
+    const sideMat = new THREE.MeshStandardMaterial({ color: '#e5dec9', roughness: 0.6 });
+    const topMat = new THREE.MeshStandardMaterial({ map: boxTexture, roughness: 0.8 });
+    const bottomMat = new THREE.MeshStandardMaterial({ color: '#c4b9a3', roughness: 0.85 });
+    return [sideMat, sideMat, sideMat, sideMat, topMat, bottomMat];
+  }, [boxTexture]);
+
+  useEffect(() => {
+    const handleSpawnBoxes = (e: CustomEvent<{ x: number; y: number; count: number }>) => {
+      const { x, y, count } = e.detail;
+      const spawnNum = Math.min(30, Math.max(6, count));
+      for (let i = 0; i < spawnNum; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2.0 + Math.random() * 6.5;
+        boxesRef.current.push({
+          x: x + (Math.random() - 0.5) * 0.5,
+          y: y + (Math.random() - 0.5) * 0.5,
+          z: 0.5 + Math.random() * 0.8,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          vz: 3.5 + Math.random() * 5.0,
+          rotX: Math.random() * Math.PI * 2,
+          rotY: Math.random() * Math.PI * 2,
+          rotZ: Math.random() * Math.PI * 2,
+          vRotX: (Math.random() - 0.5) * 10,
+          vRotY: (Math.random() - 0.5) * 10,
+          vRotZ: (Math.random() - 0.5) * 10,
+          life: 1.0,
+          decay: 0.35 + Math.random() * 0.3,
+        });
+      }
+    };
+
+    window.addEventListener('spawn_flying_boxes' as any, handleSpawnBoxes as any);
+    return () => window.removeEventListener('spawn_flying_boxes' as any, handleSpawnBoxes as any);
+  }, []);
+
+  useFrame((_, delta) => {
+    if (!meshRef.current) return;
+
+    const boxes = boxesRef.current;
+    let validCount = 0;
+
+    for (let i = boxes.length - 1; i >= 0; i--) {
+      const b = boxes[i];
+      b.life -= b.decay * delta;
+      if (b.life <= 0) {
+        boxes.splice(i, 1);
+        continue;
+      }
+
+      // Physics integration
+      b.x += b.vx * delta;
+      b.y += b.vy * delta;
+      b.z += b.vz * delta;
+
+      // Gravity
+      b.vz -= 14 * delta;
+
+      // Ground collision
+      if (b.z <= 0.15) {
+        b.z = 0.15;
+        b.vz = -b.vz * 0.45; // bounce
+        b.vx *= 0.75;
+        b.vy *= 0.75;
+        b.vRotX *= 0.6;
+        b.vRotY *= 0.6;
+        b.vRotZ *= 0.6;
+      }
+
+      // Rotations
+      b.rotX += b.vRotX * delta;
+      b.rotY += b.vRotY * delta;
+      b.rotZ += b.vRotZ * delta;
+
+      const scale = Math.max(0, b.life * 1.0);
+      dummy.position.set(b.x, b.y, b.z);
+      dummy.rotation.set(b.rotX, b.rotY, b.rotZ);
+      dummy.scale.set(scale, scale, scale);
+      dummy.updateMatrix();
+
+      meshRef.current.setMatrixAt(validCount, dummy.matrix);
+      validCount++;
+    }
+
+    meshRef.current.count = validCount;
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={meshRef} args={[null as any, null as any, 500]} castShadow receiveShadow frustumCulled={false}>
+      <boxGeometry args={[1.2, 1.2, 0.3]} />
+      <primitive object={boxMaterials[0]} attach="material-0" />
+      <primitive object={boxMaterials[1]} attach="material-1" />
+      <primitive object={boxMaterials[2]} attach="material-2" />
+      <primitive object={boxMaterials[3]} attach="material-3" />
+      <primitive object={boxMaterials[4]} attach="material-4" />
+      <primitive object={boxMaterials[5]} attach="material-5" />
+    </instancedMesh>
+  );
+}
+
 export function GameScene() {
   const isMobile = useMemo(() => {
     return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
@@ -1852,9 +1977,11 @@ export function GameScene() {
             if (orb.isShield) {
               localPlayerRef.current.hasShield = true;
               playShieldCollectSound();
+              playShieldEatSound();
             } else {
               localPlayerRef.current.score += orb.value;
               playPizzaCollectSound();
+              playPickupSound();
             }
             localCollectedOrbs.add(orbId);
             delete gs.orbs[orbId]; // predict locally
@@ -1903,7 +2030,12 @@ export function GameScene() {
             spawnExplosion(head.x, head.y, '#00f0ff', 25, 4);
           } else {
             playCrashSound();
-            spawnExplosion(head.x, head.y, '#ffb090', 40, 8);
+            playCrashSynthSound();
+            stopEngineSound();
+            window.dispatchEvent(new CustomEvent('spawn_flying_boxes', {
+              detail: { x: head.x, y: head.y, count: Math.floor(localPlayerRef.current.score) }
+            }));
+            spawnExplosion(head.x, head.y, '#ffb090', 45, 8);
             localPlayerRef.current.active = false;
             sendPlayerState({
               segments: localPlayerRef.current.segments,
@@ -1915,6 +2047,8 @@ export function GameScene() {
             });
           }
         } else {
+          // Update engine sound in real-time matching speed and boost
+          updateEngineSound(localPlayerRef.current.isBoosting ? 1.0 : 0.6, localPlayerRef.current.isBoosting);
           // Update camera target dynamically
           cameraTarget.current.x = head.x;
           cameraTarget.current.y = head.y;
@@ -2007,6 +2141,7 @@ export function GameScene() {
 
       {/* Particles System */}
       <ParticleSystem />
+      <FlyingBoxesSystem boxTexture={boxTexture} />
       
       {/* 3D Pizzeria Tables */}
       <InstancedTables clothTexture={clothTexture} />

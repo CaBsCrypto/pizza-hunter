@@ -434,83 +434,116 @@ function MovingObstacle({ config, positionsRef }: { config: MovingObstacleConfig
   );
 }
 
+interface ParticleItem {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  life: number;
+  decay: number;
+  r: number;
+  g: number;
+  b: number;
+}
+
+const MAX_PARTICLES = 300;
+
 function ParticleSystem() {
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const particles = useRef<{x: number, y: number, z: number, vx: number, vy: number, vz: number, life: number, decay: number, color: THREE.Color}[]>([]);
+  const pool = useRef<ParticleItem[]>(() => {
+    const arr: ParticleItem[] = [];
+    for (let i = 0; i < MAX_PARTICLES; i++) {
+      arr.push({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, decay: 1, r: 1, g: 1, b: 1 });
+    }
+    return arr;
+  });
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const colorObj = useMemo(() => new THREE.Color(), []);
   
   const geometry = useMemo(() => new THREE.BoxGeometry(0.15, 0.15, 0.15), []);
   const material = useMemo(() => new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true }), []);
-  const colorObj = useMemo(() => new THREE.Color(), []);
 
   useEffect(() => {
     const handleExplosion = (e: Event) => {
       const { x, y, color, count, speed } = (e as CustomEvent).detail;
-      const baseColor = new THREE.Color(color);
-      for (let i = 0; i < count; i++) {
-        if (particles.current.length > 500) break; // Hard cap
-        const angle = Math.random() * Math.PI * 2;
-        const zAngle = (Math.random() - 0.5) * Math.PI;
-        const spd = speed * (0.5 + Math.random() * 0.5);
-        particles.current.push({
-          x, y, z: 0.5 + Math.random() * 0.5,
-          vx: Math.cos(angle) * Math.cos(zAngle) * spd,
-          vy: Math.sin(angle) * Math.cos(zAngle) * spd,
-          vz: Math.sin(zAngle) * spd + 2.0, // base upward velocity
-          life: 1.0,
-          decay: 1.0 + Math.random() * 2.0,
-          color: baseColor.clone().lerp(new THREE.Color('#ffffff'), Math.random() * 0.3)
-        });
+      colorObj.set(color);
+      const items = pool.current instanceof Function ? pool.current() : pool.current;
+      let spawned = 0;
+
+      for (let i = 0; i < items.length && spawned < count; i++) {
+        const p = items[i];
+        if (p.life <= 0) {
+          const angle = Math.random() * Math.PI * 2;
+          const zAngle = (Math.random() - 0.5) * Math.PI;
+          const spd = speed * (0.5 + Math.random() * 0.5);
+          
+          p.x = x;
+          p.y = y;
+          p.z = 0.5 + Math.random() * 0.5;
+          p.vx = Math.cos(angle) * Math.cos(zAngle) * spd;
+          p.vy = Math.sin(angle) * Math.cos(zAngle) * spd;
+          p.vz = Math.sin(zAngle) * spd + 2.0;
+          p.life = 1.0;
+          p.decay = 1.0 + Math.random() * 2.0;
+          p.r = Math.min(1, colorObj.r + (Math.random() - 0.5) * 0.2);
+          p.g = Math.min(1, colorObj.g + (Math.random() - 0.5) * 0.2);
+          p.b = Math.min(1, colorObj.b + (Math.random() - 0.5) * 0.2);
+          spawned++;
+        }
       }
     };
     window.addEventListener('spawn_explosion', handleExplosion);
     return () => window.removeEventListener('spawn_explosion', handleExplosion);
-  }, []);
+  }, [colorObj]);
 
   useFrame((state, delta) => {
     if (!meshRef.current) return;
     let activeCount = 0;
     const time = state.clock.getElapsedTime();
+    const items = pool.current instanceof Function ? pool.current() : pool.current;
     
-    for (let i = 0; i < particles.current.length; i++) {
-      const p = particles.current[i];
-      p.life -= p.decay * delta;
+    for (let i = 0; i < items.length; i++) {
+      const p = items[i];
       if (p.life > 0) {
-        p.vz -= 9.8 * delta; // gravity
-        p.x += p.vx * delta;
-        p.y += p.vy * delta;
-        p.z += p.vz * delta;
-        
-        if (p.z < 0.1) {
-          p.z = 0.1;
-          p.vz *= -0.5; // bounce
-          p.vx *= 0.8; // friction
-          p.vy *= 0.8;
-        }
+        p.life -= p.decay * delta;
+        if (p.life > 0) {
+          p.vz -= 9.8 * delta; // gravity
+          p.x += p.vx * delta;
+          p.y += p.vy * delta;
+          p.z += p.vz * delta;
+          
+          if (p.z < 0.1) {
+            p.z = 0.1;
+            p.vz *= -0.5; // bounce
+            p.vx *= 0.8; // friction
+            p.vy *= 0.8;
+          }
 
-        dummy.position.set(p.x, p.y, p.z);
-        const scale = p.life;
-        dummy.scale.set(scale, scale, scale);
-        dummy.rotation.set(time * 10 + i, time * 12 + i, 0);
-        dummy.updateMatrix();
-        
-        meshRef.current.setMatrixAt(activeCount, dummy.matrix);
-        meshRef.current.setColorAt(activeCount, p.color);
-        
-        if (activeCount !== i) {
-          particles.current[activeCount] = p;
+          dummy.position.set(p.x, p.y, p.z);
+          const scale = p.life;
+          dummy.scale.set(scale, scale, scale);
+          dummy.rotation.set(time * 10 + i, time * 12 + i, 0);
+          dummy.updateMatrix();
+          
+          meshRef.current.setMatrixAt(activeCount, dummy.matrix);
+          colorObj.setRGB(p.r, p.g, p.b);
+          meshRef.current.setColorAt(activeCount, colorObj);
+          activeCount++;
         }
-        activeCount++;
       }
     }
-    particles.current.length = activeCount;
+
     meshRef.current.count = activeCount;
-    meshRef.current.instanceMatrix.needsUpdate = true;
-    if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
+    if (activeCount > 0) {
+      meshRef.current.instanceMatrix.needsUpdate = true;
+      if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
+    }
   });
 
   return (
-    <instancedMesh ref={meshRef} args={[geometry, material, 500]} frustumCulled={false} />
+    <instancedMesh ref={meshRef} args={[geometry, material, MAX_PARTICLES]} frustumCulled={false} />
   );
 }
 
@@ -555,7 +588,8 @@ function Snake({ playerId, color, isLocal, boxTexture }: { playerId: string, col
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const currentPositions = useRef<{x: number, y: number}[]>([]);
 
-  const trailParticles = useRef<{
+  const TRAIL_POOL_SIZE = isLocal ? 45 : 0;
+  const trailPool = useRef<{
     x: number;
     y: number;
     z: number;
@@ -565,7 +599,13 @@ function Snake({ playerId, color, isLocal, boxTexture }: { playerId: string, col
     vx: number;
     vy: number;
     vz: number;
-  }[]>([]);
+  }[]>(() => {
+    const arr = [];
+    for (let i = 0; i < TRAIL_POOL_SIZE; i++) {
+      arr.push({ x: 0, y: 0, z: 0, life: 0, decay: 1, size: 0.3, vx: 0, vy: 0, vz: 0 });
+    }
+    return arr;
+  });
 
   const trailGeometry = useMemo(() => {
     return new THREE.OctahedronGeometry(0.35, 0);
@@ -613,7 +653,6 @@ function Snake({ playerId, color, isLocal, boxTexture }: { playerId: string, col
     }
     
     headRef.current.visible = true;
-    headRef.current.visible = true;
     bodyRef.current.visible = true;
 
     // Animate shield bubble
@@ -639,67 +678,63 @@ function Snake({ playerId, color, isLocal, boxTexture }: { playerId: string, col
       }
     }
 
-    // Update and animate trail particles
-    if (trailMeshRef.current) {
-      const particles = trailParticles.current;
+    // Update and animate trail particles (optimized object-pooled)
+    if (trailMeshRef.current && isLocal) {
+      const pool = trailPool.current instanceof Function ? trailPool.current() : trailPool.current;
 
-      // Spawn new trail particles
+      // Spawn new trail particle into pool
       if (player.state === 'alive' && player.segments.length > 0) {
         const head = player.segments[0];
         const isBoosting = !!player.isBoosting;
         const spawnCount = isBoosting ? 2 : 1;
+        let spawned = 0;
 
-        for (let s = 0; s < spawnCount; s++) {
-          // Shoot particles backwards based on current moving angle
-          const angle = player.currentAngle;
-          const speedFactor = isBoosting ? 2.5 : 1.2;
-          particles.push({
-            x: head.x + (Math.random() - 0.5) * 0.25,
-            y: head.y + (Math.random() - 0.5) * 0.25,
-            z: 0.15 + Math.random() * 0.2,
-            life: 1.0,
-            decay: isBoosting ? 1.4 : 1.0, // boosting particles fade slightly quicker for shorter hot trails
-            size: isBoosting ? 0.45 : 0.32,
-            vx: -Math.cos(angle) * speedFactor + (Math.random() - 0.5) * 0.4,
-            vy: -Math.sin(angle) * speedFactor + (Math.random() - 0.5) * 0.4,
-            vz: 0.1 + Math.random() * 0.2,
-          });
+        for (let i = 0; i < pool.length && spawned < spawnCount; i++) {
+          const p = pool[i];
+          if (p.life <= 0) {
+            const angle = player.currentAngle;
+            const speedFactor = isBoosting ? 2.5 : 1.2;
+            p.x = head.x + (Math.random() - 0.5) * 0.25;
+            p.y = head.y + (Math.random() - 0.5) * 0.25;
+            p.z = 0.15 + Math.random() * 0.2;
+            p.life = 1.0;
+            p.decay = isBoosting ? 1.5 : 1.1;
+            p.size = isBoosting ? 0.45 : 0.32;
+            p.vx = -Math.cos(angle) * speedFactor + (Math.random() - 0.5) * 0.4;
+            p.vy = -Math.sin(angle) * speedFactor + (Math.random() - 0.5) * 0.4;
+            p.vz = 0.1 + Math.random() * 0.2;
+            spawned++;
+          }
         }
-      }
-
-      // Safeguard total trail particles per player
-      if (particles.length > 150) {
-        particles.splice(0, particles.length - 150);
       }
 
       // Update particle physics and build instanced transformation matrices
       let activeCount = 0;
       const time = state.clock.getElapsedTime();
-      for (let j = 0; j < particles.length; j++) {
-        const p = particles[j];
-        p.life -= p.decay * delta;
+      for (let j = 0; j < pool.length; j++) {
+        const p = pool[j];
         if (p.life > 0) {
-          p.x += p.vx * delta;
-          p.y += p.vy * delta;
-          p.z += p.vz * delta;
+          p.life -= p.decay * delta;
+          if (p.life > 0) {
+            p.x += p.vx * delta;
+            p.y += p.vy * delta;
+            p.z += p.vz * delta;
 
-          dummy.position.set(p.x, p.y, p.z);
-          const scale = p.size * p.life;
-          dummy.scale.set(scale, scale, scale);
-          dummy.rotation.set(time * 3 + j, time * 2, 0);
-          dummy.updateMatrix();
+            dummy.position.set(p.x, p.y, p.z);
+            const scale = p.size * p.life;
+            dummy.scale.set(scale, scale, scale);
+            dummy.rotation.set(time * 3 + j, time * 2, 0);
+            dummy.updateMatrix();
 
-          trailMeshRef.current.setMatrixAt(activeCount, dummy.matrix);
-
-          if (activeCount !== j) {
-            particles[activeCount] = p;
+            trailMeshRef.current.setMatrixAt(activeCount, dummy.matrix);
+            activeCount++;
           }
-          activeCount++;
         }
       }
-      particles.length = activeCount;
       trailMeshRef.current.count = activeCount;
-      trailMeshRef.current.instanceMatrix.needsUpdate = true;
+      if (activeCount > 0) {
+        trailMeshRef.current.instanceMatrix.needsUpdate = true;
+      }
     }
 
     const count = player.segments.length;
@@ -997,26 +1032,22 @@ function Orbs({ pizzaTexture }: { pizzaTexture: THREE.CanvasTexture }) {
   );
 }
 
-interface FlyingBoxParticle {
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  vz: number;
-  rotX: number;
-  rotY: number;
-  rotZ: number;
-  vRotX: number;
-  vRotY: number;
-  vRotZ: number;
-  life: number;
-  decay: number;
-}
+const MAX_FLYING_BOXES = 40;
 
 function FlyingBoxesSystem({ boxTexture }: { boxTexture: THREE.CanvasTexture }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const boxesRef = useRef<FlyingBoxParticle[]>([]);
+  const pool = useRef<FlyingBoxParticle[]>(() => {
+    const arr: FlyingBoxParticle[] = [];
+    for (let i = 0; i < MAX_FLYING_BOXES; i++) {
+      arr.push({
+        x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
+        rotX: 0, rotY: 0, rotZ: 0,
+        vRotX: 0, vRotY: 0, vRotZ: 0,
+        life: 0, decay: 1,
+      });
+    }
+    return arr;
+  });
   const dummy = useMemo(() => new THREE.Object3D(), []);
 
   const boxMaterials = useMemo(() => {
@@ -1029,26 +1060,31 @@ function FlyingBoxesSystem({ boxTexture }: { boxTexture: THREE.CanvasTexture }) 
   useEffect(() => {
     const handleSpawnBoxes = (e: CustomEvent<{ x: number; y: number; count: number }>) => {
       const { x, y, count } = e.detail;
-      const spawnNum = Math.min(30, Math.max(6, count));
-      for (let i = 0; i < spawnNum; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 2.0 + Math.random() * 6.5;
-        boxesRef.current.push({
-          x: x + (Math.random() - 0.5) * 0.5,
-          y: y + (Math.random() - 0.5) * 0.5,
-          z: 0.5 + Math.random() * 0.8,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          vz: 3.5 + Math.random() * 5.0,
-          rotX: Math.random() * Math.PI * 2,
-          rotY: Math.random() * Math.PI * 2,
-          rotZ: Math.random() * Math.PI * 2,
-          vRotX: (Math.random() - 0.5) * 10,
-          vRotY: (Math.random() - 0.5) * 10,
-          vRotZ: (Math.random() - 0.5) * 10,
-          life: 1.0,
-          decay: 0.35 + Math.random() * 0.3,
-        });
+      const spawnNum = Math.min(25, Math.max(6, count));
+      const items = pool.current instanceof Function ? pool.current() : pool.current;
+      let spawned = 0;
+
+      for (let i = 0; i < items.length && spawned < spawnNum; i++) {
+        const b = items[i];
+        if (b.life <= 0) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 2.0 + Math.random() * 6.0;
+          b.x = x + (Math.random() - 0.5) * 0.4;
+          b.y = y + (Math.random() - 0.5) * 0.4;
+          b.z = 0.5 + Math.random() * 0.6;
+          b.vx = Math.cos(angle) * speed;
+          b.vy = Math.sin(angle) * speed;
+          b.vz = 3.5 + Math.random() * 4.5;
+          b.rotX = Math.random() * Math.PI * 2;
+          b.rotY = Math.random() * Math.PI * 2;
+          b.rotZ = Math.random() * Math.PI * 2;
+          b.vRotX = (Math.random() - 0.5) * 8;
+          b.vRotY = (Math.random() - 0.5) * 8;
+          b.vRotZ = (Math.random() - 0.5) * 8;
+          b.life = 1.0;
+          b.decay = 0.4 + Math.random() * 0.3;
+          spawned++;
+        }
       }
     };
 
@@ -1059,57 +1095,58 @@ function FlyingBoxesSystem({ boxTexture }: { boxTexture: THREE.CanvasTexture }) 
   useFrame((_, delta) => {
     if (!meshRef.current) return;
 
-    const boxes = boxesRef.current;
+    const items = pool.current instanceof Function ? pool.current() : pool.current;
     let validCount = 0;
 
-    for (let i = boxes.length - 1; i >= 0; i--) {
-      const b = boxes[i];
-      b.life -= b.decay * delta;
-      if (b.life <= 0) {
-        boxes.splice(i, 1);
-        continue;
+    for (let i = 0; i < items.length; i++) {
+      const b = items[i];
+      if (b.life > 0) {
+        b.life -= b.decay * delta;
+        if (b.life > 0) {
+          // Physics integration
+          b.x += b.vx * delta;
+          b.y += b.vy * delta;
+          b.z += b.vz * delta;
+
+          // Gravity
+          b.vz -= 14 * delta;
+
+          // Ground collision
+          if (b.z <= 0.15) {
+            b.z = 0.15;
+            b.vz = -b.vz * 0.45; // bounce
+            b.vx *= 0.75;
+            b.vy *= 0.75;
+            b.vRotX *= 0.6;
+            b.vRotY *= 0.6;
+            b.vRotZ *= 0.6;
+          }
+
+          // Rotations
+          b.rotX += b.vRotX * delta;
+          b.rotY += b.vRotY * delta;
+          b.rotZ += b.vRotZ * delta;
+
+          const scale = Math.max(0, b.life * 1.0);
+          dummy.position.set(b.x, b.y, b.z);
+          dummy.rotation.set(b.rotX, b.rotY, b.rotZ);
+          dummy.scale.set(scale, scale, scale);
+          dummy.updateMatrix();
+
+          meshRef.current.setMatrixAt(validCount, dummy.matrix);
+          validCount++;
+        }
       }
-
-      // Physics integration
-      b.x += b.vx * delta;
-      b.y += b.vy * delta;
-      b.z += b.vz * delta;
-
-      // Gravity
-      b.vz -= 14 * delta;
-
-      // Ground collision
-      if (b.z <= 0.15) {
-        b.z = 0.15;
-        b.vz = -b.vz * 0.45; // bounce
-        b.vx *= 0.75;
-        b.vy *= 0.75;
-        b.vRotX *= 0.6;
-        b.vRotY *= 0.6;
-        b.vRotZ *= 0.6;
-      }
-
-      // Rotations
-      b.rotX += b.vRotX * delta;
-      b.rotY += b.vRotY * delta;
-      b.rotZ += b.vRotZ * delta;
-
-      const scale = Math.max(0, b.life * 1.0);
-      dummy.position.set(b.x, b.y, b.z);
-      dummy.rotation.set(b.rotX, b.rotY, b.rotZ);
-      dummy.scale.set(scale, scale, scale);
-      dummy.updateMatrix();
-
-      meshRef.current.setMatrixAt(validCount, dummy.matrix);
-      validCount++;
     }
 
     meshRef.current.count = validCount;
-    meshRef.current.instanceMatrix.needsUpdate = true;
+    if (validCount > 0) {
+      meshRef.current.instanceMatrix.needsUpdate = true;
+    }
   });
 
   return (
-    <instancedMesh ref={meshRef} args={[null as any, null as any, 500]} castShadow receiveShadow frustumCulled={false}>
+    <instancedMesh ref={meshRef} args={[null as any, null as any, MAX_FLYING_BOXES]} castShadow receiveShadow frustumCulled={false}>
       <boxGeometry args={[1.2, 1.2, 0.3]} />
       <primitive object={boxMaterials[0]} attach="material-0" />
       <primitive object={boxMaterials[1]} attach="material-1" />

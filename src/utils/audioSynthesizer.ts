@@ -99,9 +99,22 @@ export function startEngineSound() {
   }
 }
 
+let lastEngineUpdate = 0;
+let lastSpeedRatio = -1;
+let lastBoostingState = false;
+
 export function updateEngineSound(speedRatio: number, isBoosting: boolean) {
   const ctx = getAudioContext();
   if (!ctx || isMuted) return;
+
+  const nowMs = performance.now();
+  // Throttle to at most 12 Hz if values didn't change drastically
+  if (nowMs - lastEngineUpdate < 80 && Math.abs(speedRatio - lastSpeedRatio) < 0.05 && isBoosting === lastBoostingState) {
+    return;
+  }
+  lastEngineUpdate = nowMs;
+  lastSpeedRatio = speedRatio;
+  lastBoostingState = isBoosting;
 
   if (!engineOsc1) {
     startEngineSound();

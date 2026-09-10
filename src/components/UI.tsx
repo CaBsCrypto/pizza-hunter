@@ -24,9 +24,15 @@ import {
   ChevronDown,
   X,
   Volume2,
-  VolumeX
+  VolumeX,
+  Globe,
+  Send,
+  Loader2,
+  RefreshCw,
+  Mail
 } from 'lucide-react';
 import { toggleMuteAudio, getIsMuted } from '../utils/audioSynthesizer';
+import { submitScore, getLeaderboard, SpicyLeaderboardEntry } from '../utils/spicycrustApi';
 import { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
@@ -159,10 +165,45 @@ export function UI() {
     return saved ? parseInt(saved, 10) : 0;
   });
 
+  // SpicyCrust API States
+  const [submitEmail, setSubmitEmail] = useState<string>(() => {
+    return localStorage.getItem('pizza_hunter_email') || '';
+  });
+  const [isSubmittingScore, setIsSubmittingScore] = useState<boolean>(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
+  const [showSpicyLeaderboard, setShowSpicyLeaderboard] = useState<boolean>(false);
+  const [leaderboardTab, setLeaderboardTab] = useState<'spicy' | 'local'>('spicy');
+  const [spicyRanking, setSpicyRanking] = useState<SpicyLeaderboardEntry[]>([]);
+  const [isLoadingRanking, setIsLoadingRanking] = useState<boolean>(false);
+
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [isMutedState, setIsMutedState] = useState<boolean>(() => getIsMuted());
 
   const currentScore = player ? Math.floor(player.score) : 0;
+
+  const fetchSpicyLeaderboard = async () => {
+    setIsLoadingRanking(true);
+    try {
+      const data = await getLeaderboard(10);
+      setSpicyRanking(data);
+    } catch (e) {
+      console.warn('Failed to load SpicyCrust leaderboard', e);
+    } finally {
+      setIsLoadingRanking(false);
+    }
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '--';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr.split(' ')[0] || dateStr;
+      return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
 
   useEffect(() => {
     if (currentScore > highestScore) {
@@ -816,33 +857,64 @@ export function UI() {
 
             {/* GAME OVER SCREEN */}
             {isDead && !gameState?.isRoundOver && (() => {
-              const qualifies = currentScore > 5 && (
-                localHighscores.length < 5 || currentScore > localHighscores[localHighscores.length - 1].score
-              );
-              
-              const saveScore = () => {
-                const cleanName = chefName.trim().substring(0, 10) || 'Chef';
-                const newScore = {
-                  name: cleanName,
-                  score: currentScore,
-                  date: new Date().toISOString().split('T')[0]
-                };
-                const updated = [...localHighscores, newScore]
-                  .sort((a, b) => b.score - a.score)
-                  .slice(0, 5);
-                setLocalHighscores(updated);
-                localStorage.setItem('pizza_hunter_local_highscores', JSON.stringify(updated));
-                setHasSavedRecord(true);
-              };
-
               const survivalSecs = Math.max(1, Math.floor((Date.now() - matchStartTime.current) / 1000));
+
+              const handleSendScore = async () => {
+                const cleanNick = chefName.trim().substring(0, 20);
+                if (!cleanNick) {
+                  setSubmitError('Por favor ingresa un nombre para el leaderboard.');
+                  return;
+                }
+                setIsSubmittingScore(true);
+                setSubmitError(null);
+                try {
+                  localStorage.setItem('pizza_hunter_chef_name', cleanNick);
+                  if (submitEmail.trim()) {
+                    localStorage.setItem('pizza_hunter_email', submitEmail.trim());
+                  }
+
+                  // Also save locally
+                  const newScore = {
+                    name: cleanNick,
+                    score: currentScore,
+                    date: new Date().toISOString().split('T')[0],
+                  };
+                  const updated = [...localHighscores, newScore]
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 10);
+                  setLocalHighscores(updated);
+                  localStorage.setItem('pizza_hunter_local_highscores', JSON.stringify(updated));
+
+                  // Submit to SpicyCrust API
+                  await submitScore({
+                    nickname: cleanNick,
+                    email: submitEmail.trim(),
+                    score: currentScore,
+                    metadata: {
+                      survivalSecs,
+                      color: selectedColor,
+                    },
+                  });
+
+                  setSubmitSuccess(true);
+                  // Load latest rankings and transition to leaderboard
+                  await fetchSpicyLeaderboard();
+                  setTimeout(() => {
+                    setShowSpicyLeaderboard(true);
+                  }, 600);
+                } catch (err: any) {
+                  setSubmitError(err?.message || 'Error al conectar con la API de SpicyCrust.');
+                } finally {
+                  setIsSubmittingScore(false);
+                }
+              };
 
               return (
                 <motion.div
                   initial={{ scale: 0.9, y: 20, opacity: 0 }}
                   animate={{ scale: 1, y: 0, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
-                  className="bg-neutral-900/95 p-6 md:p-7 rounded-3xl border border-red-500/30 shadow-2xl shadow-red-500/10 max-w-md w-full flex flex-col items-center gap-5 pointer-events-auto relative overflow-hidden"
+                  className="bg-neutral-900/95 p-6 md:p-7 rounded-3xl border border-red-500/30 shadow-2xl shadow-red-500/10 max-w-md w-full flex flex-col items-center gap-4 pointer-events-auto relative overflow-hidden my-auto"
                 >
                   {/* Glowing background aura */}
                   <div className="absolute -top-24 -left-24 w-48 h-48 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -853,89 +925,139 @@ export function UI() {
                       initial={{ rotate: -15, scale: 0.5 }}
                       animate={{ rotate: 0, scale: 1 }}
                       transition={{ type: 'spring', stiffness: 300 }}
-                      className="inline-block text-4xl mb-1"
+                      className="inline-block text-4xl mb-0.5"
                     >
                       💥
                     </motion.div>
-                    <h2 className="text-3xl font-black text-red-500 tracking-tight uppercase" style={{ textShadow: '0 0 15px rgba(239, 68, 68, 0.4)' }}>
+                    <h2 className="text-2xl md:text-3xl font-black text-red-500 tracking-tight uppercase" style={{ textShadow: '0 0 15px rgba(239, 68, 68, 0.4)' }}>
                       ¡ACCIDENTE EN LA PIZZERÍA!
                     </h2>
-                    <p className="text-white/60 text-xs mt-1">Chocaste contra un obstáculo de la arena</p>
+                    <p className="text-white/60 text-xs mt-0.5">Chocaste contra un obstáculo de la arena</p>
                     
                     {/* 3-Column Stats Card Grid */}
-                    <div className="grid grid-cols-3 gap-2 bg-black/50 border border-white/10 rounded-2xl p-3 w-full my-4">
-                      <div className="flex flex-col items-center justify-center p-1.5">
-                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block mb-0.5">Apiladas</span>
+                    <div className="grid grid-cols-3 gap-2 bg-black/50 border border-white/10 rounded-2xl p-2.5 w-full my-3">
+                      <div className="flex flex-col items-center justify-center p-1">
+                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block mb-0.5">Puntaje</span>
                         <span className="text-yellow-400 font-mono font-black text-xl">{currentScore}</span>
                       </div>
                       
-                      <div className="flex flex-col items-center justify-center p-1.5 border-x border-white/10">
+                      <div className="flex flex-col items-center justify-center p-1 border-x border-white/10">
                         <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block mb-0.5">Tiempo</span>
                         <span className="text-emerald-400 font-mono font-extrabold text-xl">{survivalSecs}s</span>
                       </div>
 
-                      <div className="flex flex-col items-center justify-center p-1.5">
+                      <div className="flex flex-col items-center justify-center p-1">
                         <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block mb-0.5">🏆 Récord</span>
                         <span className="text-amber-400 font-mono font-extrabold text-xl">{Math.max(highestScore, currentScore)}</span>
                       </div>
                     </div>
 
-                    {qualifies && !hasSavedRecord ? (
-                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3.5 flex flex-col gap-2.5 w-full text-left">
-                        <span className="text-amber-400 text-[10px] font-black font-mono tracking-wider uppercase block text-center animate-pulse">✨ ¡NUEVO RÉCORD DE APILAMIENTO! ✨</span>
-                        <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            value={chefName} 
-                            onChange={(e) => setChefName(e.target.value)} 
-                            maxLength={10}
-                            placeholder="Tu nombre..."
-                            className="flex-1 px-3 py-2 bg-black/60 border border-amber-500/40 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-amber-400"
+                    {/* SpicyCrust Score Submission Form */}
+                    <div className="bg-black/40 border border-amber-500/25 rounded-2xl p-3.5 w-full flex flex-col gap-2.5 text-left mb-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-amber-400 text-xs font-black font-mono tracking-wider uppercase flex items-center gap-1.5">
+                          <Sparkles size={13} />
+                          Enviar a Leaderboard
+                        </span>
+                        <span className="text-[8px] font-mono text-white/50 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                          SpicyCrust API
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <div>
+                          <label className="text-white/50 text-[9px] font-mono uppercase tracking-wider block mb-1">
+                            Nombre / Apodo <span className="text-amber-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={chefName}
+                            onChange={(e) => setChefName(e.target.value)}
+                            maxLength={20}
+                            placeholder="Ingresa tu nombre..."
+                            className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white font-mono text-xs focus:outline-none transition-colors"
                           />
-                          <button 
-                            onClick={saveScore}
-                            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-black rounded-xl text-xs tracking-wider transition-all shadow-md active:scale-95"
-                          >
-                            GUARDAR
-                          </button>
+                        </div>
+
+                        <div>
+                          <label className="text-white/50 text-[9px] font-mono uppercase tracking-wider block mb-1">
+                            Email (Opcional)
+                          </label>
+                          <input
+                            type="email"
+                            value={submitEmail}
+                            onChange={(e) => setSubmitEmail(e.target.value)}
+                            placeholder="tu@email.com (opcional)"
+                            className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white font-mono text-xs focus:outline-none transition-colors"
+                          />
                         </div>
                       </div>
-                    ) : (
-                      /* Top 5 Local Highscores */
-                      <div className="bg-black/40 border border-white/5 rounded-2xl p-3.5 w-full text-left flex flex-col gap-1.5">
-                        <span className="text-white/40 text-[9px] font-bold uppercase tracking-widest block text-center mb-1">🏆 TOP 5 REPARTIDORES 🏆</span>
-                        {localHighscores.map((entry, idx) => (
-                          <div key={idx} className="flex justify-between items-center text-xs font-mono">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold ${
-                                idx === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-neutral-800 text-white/50'
-                              }`}>{idx + 1}</span>
-                              <span className="text-white font-bold">{entry.name}</span>
-                            </div>
-                            <span className="text-amber-400 font-extrabold">{entry.score} cajas</span>
-                          </div>
-                        ))}
+
+                      {submitError && (
+                        <div className="bg-red-950/60 border border-red-500/40 text-red-300 text-[11px] p-2 rounded-lg font-mono flex items-center gap-2">
+                          <X size={14} className="text-red-400 shrink-0" />
+                          <span>{submitError}</span>
+                        </div>
+                      )}
+
+                      {submitSuccess && (
+                        <div className="bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-[11px] p-2 rounded-lg font-mono flex items-center gap-2">
+                          <Check size={14} className="text-emerald-400 shrink-0" />
+                          <span>¡Puntaje enviado con éxito a SpicyCrust!</span>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={handleSendScore}
+                          disabled={isSubmittingScore || submitSuccess}
+                          className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-neutral-950 font-black rounded-xl text-xs tracking-wider transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                        >
+                          {isSubmittingScore ? (
+                            <>
+                              <Loader2 size={13} className="animate-spin" />
+                              <span>ENVIANDO...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send size={13} />
+                              <span>ENVIAR PUNTAJE</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            fetchSpicyLeaderboard();
+                            setShowSpicyLeaderboard(true);
+                          }}
+                          className="px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white/80 font-bold rounded-xl text-xs tracking-wider transition-all active:scale-95 cursor-pointer border border-white/5"
+                        >
+                          SALTAR
+                        </button>
                       </div>
-                    )}
+                    </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="w-full flex flex-col gap-2.5 relative z-10">
+                  {/* Instant Revenge and Menu Actions */}
+                  <div className="w-full flex flex-col gap-2 relative z-10">
                     <button
                       onClick={handleJoin}
-                      className="w-full py-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-neutral-950 font-black rounded-2xl hover:brightness-110 active:scale-95 transition-all text-base tracking-wider shadow-lg shadow-amber-500/25 border border-yellow-300/40 relative overflow-hidden group flex flex-col items-center justify-center gap-0.5"
+                      className="w-full py-3 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-neutral-950 font-black rounded-xl hover:brightness-110 active:scale-95 transition-all text-sm tracking-wider shadow-lg shadow-amber-500/25 border border-yellow-300/40 relative overflow-hidden group flex flex-col items-center justify-center gap-0.5 cursor-pointer"
                     >
-                      <span className="flex items-center gap-2 font-black text-sm md:text-base uppercase tracking-wider">
-                        <Zap size={18} className="text-neutral-950 fill-neutral-950 animate-pulse" />
+                      <span className="flex items-center gap-1.5 font-black uppercase tracking-wider">
+                        <Zap size={16} className="text-neutral-950 fill-neutral-950 animate-pulse" />
                         ¡REVANCHA INSTANTÁNEA!
                       </span>
-                      <span className="text-[9px] text-neutral-900/80 font-mono font-bold tracking-widest uppercase">
+                      <span className="text-[8px] text-neutral-900/80 font-mono font-bold tracking-widest uppercase">
                         (Presiona ESPACIO, ENTER o A)
                       </span>
                     </button>
                     <button
                       onClick={quitGame}
-                      className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-bold rounded-xl active:scale-95 transition-all text-xs border border-white/5"
+                      className="w-full py-2 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-bold rounded-xl active:scale-95 transition-all text-xs border border-white/5 cursor-pointer"
                     >
                       SALIR AL MENÚ PRINCIPAL
                     </button>
@@ -1001,7 +1123,10 @@ export function UI() {
                       </button>
 
                       <button
-                        onClick={() => setShowHighscoresModal(true)}
+                        onClick={() => {
+                          fetchSpicyLeaderboard();
+                          setShowHighscoresModal(true);
+                        }}
                         className="w-full sm:w-44 py-4 bg-neutral-900 border border-white/10 hover:bg-neutral-800 text-white font-bold rounded-2xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <Award size={18} className="text-yellow-500" />
@@ -1177,59 +1302,209 @@ export function UI() {
               </div>
             )}
 
-            {/* HIGHSCORES MODAL */}
-            {!gameState && !isInLobby && showHighscoresModal && (
+            {/* UNIFIED LEADERBOARD MODAL (SpicyCrust Global & Local) */}
+            {(showHighscoresModal || showSpicyLeaderboard) && (
               <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-auto">
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  onClick={() => setShowHighscoresModal(false)}
-                  className="absolute inset-0 bg-black/75 backdrop-blur-md cursor-pointer"
+                  onClick={() => {
+                    setShowHighscoresModal(false);
+                    setShowSpicyLeaderboard(false);
+                  }}
+                  className="absolute inset-0 bg-black/80 backdrop-blur-md cursor-pointer"
                 />
 
                 <motion.div
                   initial={{ scale: 0.95, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="bg-neutral-900 border border-white/10 rounded-3xl p-6 md:p-8 max-w-sm w-full relative z-10 flex flex-col gap-5 shadow-2xl overflow-y-auto max-h-[95vh]"
+                  className="bg-neutral-900 border border-amber-500/30 rounded-3xl p-5 md:p-7 max-w-lg w-full relative z-10 flex flex-col gap-4 shadow-2xl overflow-hidden max-h-[90vh]"
                 >
+                  {/* Modal Header */}
                   <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-black text-amber-500 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                      <Award size={16} className="text-yellow-500" />
-                      Salón de la Fama
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+                        <Trophy size={18} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-amber-500 uppercase tracking-wider font-mono">
+                          Salón de la Fama
+                        </h3>
+                        <span className="text-[10px] text-white/50 font-mono">
+                          Slice Hunter × SpicyCrust Arena
+                        </span>
+                      </div>
+                    </div>
                     <button
-                      onClick={() => setShowHighscoresModal(false)}
+                      onClick={() => {
+                        setShowHighscoresModal(false);
+                        setShowSpicyLeaderboard(false);
+                      }}
                       className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
                     >
-                      <X size={14} />
+                      <X size={16} />
                     </button>
                   </div>
 
-                  <div className="bg-black/40 border border-white/5 rounded-2xl p-4 w-full text-left flex flex-col gap-2.5">
-                    {localHighscores.map((entry, idx) => (
-                      <div key={idx} className="flex justify-between items-center text-sm font-mono border-b border-white/5 pb-2 last:border-0 last:pb-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold ${
-                            idx === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                            idx === 1 ? 'bg-white/10 text-white/70' :
-                            idx === 2 ? 'bg-amber-800/20 text-amber-600' : 'bg-neutral-800 text-white/40'
-                          }`}>{idx + 1}</span>
-                          <span className="text-white font-extrabold">{entry.name}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <span className="text-amber-400 font-extrabold text-sm">{entry.score} pizzas</span>
-                          <span className="text-[8px] text-white/20">{entry.date}</span>
-                        </div>
-                      </div>
-                    ))}
+                  {/* Tabs Selector: SpicyCrust Global vs Local */}
+                  <div className="grid grid-cols-2 gap-2 bg-black/40 p-1 rounded-xl border border-white/5 font-mono text-xs">
+                    <button
+                      onClick={() => {
+                        setLeaderboardTab('spicy');
+                        fetchSpicyLeaderboard();
+                      }}
+                      className={`flex items-center justify-center gap-1.5 py-2 rounded-lg font-bold transition-all cursor-pointer ${
+                        leaderboardTab === 'spicy'
+                          ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/20'
+                          : 'text-white/60 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <Globe size={13} />
+                      <span>SPICYCRUST (GLOBAL)</span>
+                    </button>
+                    <button
+                      onClick={() => setLeaderboardTab('local')}
+                      className={`flex items-center justify-center gap-1.5 py-2 rounded-lg font-bold transition-all cursor-pointer ${
+                        leaderboardTab === 'local'
+                          ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/20'
+                          : 'text-white/60 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <Award size={13} />
+                      <span>LOCAL (ESTE EQUIPO)</span>
+                    </button>
                   </div>
 
-                  <button
-                    onClick={() => setShowHighscoresModal(false)}
-                    className="w-full py-3 bg-white/5 text-white/80 font-bold rounded-xl hover:bg-white/10 active:scale-95 transition-all text-xs cursor-pointer"
-                  >
-                    CERRAR
-                  </button>
+                  {/* Tab Contents */}
+                  {leaderboardTab === 'spicy' ? (
+                    <div className="flex flex-col gap-2.5">
+                      <div className="flex justify-between items-center px-1">
+                        <span className="text-[10px] text-white/40 font-mono uppercase tracking-wider">
+                          TOP 10 MEJORES PUNTAJES
+                        </span>
+                        <button
+                          onClick={fetchSpicyLeaderboard}
+                          disabled={isLoadingRanking}
+                          className="flex items-center gap-1 text-[10px] text-amber-400/80 hover:text-amber-400 font-mono transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          <RefreshCw size={11} className={isLoadingRanking ? 'animate-spin' : ''} />
+                          <span>Actualizar</span>
+                        </button>
+                      </div>
+
+                      <div className="bg-black/50 border border-white/5 rounded-2xl p-3 w-full max-h-64 overflow-y-auto flex flex-col gap-1.5">
+                        {isLoadingRanking ? (
+                          <div className="py-8 flex flex-col items-center justify-center gap-2 text-white/50 font-mono text-xs">
+                            <Loader2 size={22} className="animate-spin text-amber-400" />
+                            <span>Cargando leaderboard de SpicyCrust...</span>
+                          </div>
+                        ) : spicyRanking.length === 0 ? (
+                          <div className="py-8 text-center text-white/40 font-mono text-xs flex flex-col items-center gap-2">
+                            <span>🍕 ¡Sé el primer repartidor en registrar su récord!</span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-12 text-[10px] font-mono text-white/40 px-2 pb-1 border-b border-white/5">
+                              <span className="col-span-2">#</span>
+                              <span className="col-span-5">JUGADOR</span>
+                              <span className="col-span-3 text-right">PUNTAJE</span>
+                              <span className="col-span-2 text-right">FECHA</span>
+                            </div>
+                            {spicyRanking.map((entry, idx) => {
+                              const rank = entry.rank ?? idx + 1;
+                              const isTop1 = rank === 1;
+                              const isTop2 = rank === 2;
+                              const isTop3 = rank === 3;
+                              const isCurrentPlayer = chefName.trim() && entry.nickname?.toLowerCase() === chefName.trim().toLowerCase();
+
+                              let medalBadge = <span className="text-white/40 font-mono text-xs">{rank}</span>;
+                              if (isTop1) medalBadge = <span className="text-base" title="1er Lugar">🥇</span>;
+                              else if (isTop2) medalBadge = <span className="text-base" title="2do Lugar">🥈</span>;
+                              else if (isTop3) medalBadge = <span className="text-base" title="3er Lugar">🥉</span>;
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`grid grid-cols-12 items-center px-2 py-1.5 rounded-xl font-mono text-xs transition-colors ${
+                                    isCurrentPlayer
+                                      ? 'bg-amber-500/15 border border-amber-500/30 text-amber-300'
+                                      : 'hover:bg-white/5 text-white/90'
+                                  }`}
+                                >
+                                  <div className="col-span-2 flex items-center">{medalBadge}</div>
+                                  <div className="col-span-5 truncate font-bold flex items-center gap-1.5">
+                                    <span className="truncate">{entry.nickname || 'Anónimo'}</span>
+                                    {isCurrentPlayer && (
+                                      <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 py-0.2 rounded shrink-0">Tú</span>
+                                    )}
+                                  </div>
+                                  <div className="col-span-3 text-right font-black text-amber-400">
+                                    {entry.score} 🍕
+                                  </div>
+                                  <div className="col-span-2 text-right text-[9px] text-white/30 truncate">
+                                    {formatDate(entry.created_at)}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-black/50 border border-white/5 rounded-2xl p-3 w-full max-h-64 overflow-y-auto flex flex-col gap-1.5">
+                      <div className="grid grid-cols-12 text-[10px] font-mono text-white/40 px-2 pb-1 border-b border-white/5">
+                        <span className="col-span-2">#</span>
+                        <span className="col-span-6">JUGADOR</span>
+                        <span className="col-span-4 text-right">PUNTAJE</span>
+                      </div>
+                      {localHighscores.map((entry, idx) => (
+                        <div key={idx} className="grid grid-cols-12 items-center px-2 py-1.5 rounded-xl font-mono text-xs hover:bg-white/5">
+                          <div className="col-span-2">
+                            <span className={`w-5 h-5 rounded flex items-center justify-center text-[11px] font-bold ${
+                              idx === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                              idx === 1 ? 'bg-white/10 text-white/70' :
+                              idx === 2 ? 'bg-amber-800/20 text-amber-600' : 'bg-neutral-800 text-white/40'
+                            }`}>{idx + 1}</span>
+                          </div>
+                          <div className="col-span-6 truncate font-bold text-white">
+                            {entry.name}
+                          </div>
+                          <div className="col-span-4 text-right font-black text-amber-400">
+                            {entry.score} 🍕
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-1">
+                    {isDead && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowHighscoresModal(false);
+                          setShowSpicyLeaderboard(false);
+                          handleJoin();
+                        }}
+                        className="flex-1 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-black rounded-xl text-xs tracking-wider transition-all shadow-lg shadow-amber-500/20 cursor-pointer"
+                      >
+                        ¡VOLVER A JUGAR!
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowHighscoresModal(false);
+                        setShowSpicyLeaderboard(false);
+                      }}
+                      className={`${isDead ? 'px-5' : 'w-full'} py-3 bg-white/10 hover:bg-white/15 text-white/90 font-bold rounded-xl active:scale-95 transition-all text-xs cursor-pointer border border-white/5`}
+                    >
+                      CERRAR
+                    </button>
+                  </div>
                 </motion.div>
               </div>
             )}

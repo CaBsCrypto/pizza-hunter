@@ -9,10 +9,7 @@ import {
   ExternalLink,
   Trophy,
   LogOut,
-  Users,
-  Bot,
   Sparkles,
-  ArrowRight,
   Copy,
   Check,
   Play,
@@ -29,9 +26,11 @@ import {
   Send,
   Loader2,
   RefreshCw,
-  Mail
+  Mail,
+  Palette
 } from 'lucide-react';
 import { toggleMuteAudio, getIsMuted } from '../utils/audioSynthesizer';
+import { playCountdownTickSound, playRoundOverSound } from '../utils/audio';
 import { submitScore, getLeaderboard, SpicyLeaderboardEntry } from '../utils/spicycrustApi';
 import { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
@@ -105,7 +104,262 @@ function VespaShowcase({ color }: { color: string }) {
     </div>
   );
 }
-import { playCountdownTickSound, playRoundOverSound } from '../utils/audio';
+interface ScoreSubmissionFormProps {
+  chefName: string;
+  setChefName: (name: string) => void;
+  submitEmail: string;
+  setSubmitEmail: (email: string) => void;
+  currentScore: number;
+  survivalSecs: number;
+  selectedColor: string;
+  localHighscores: { name: string; score: number; date: string }[];
+  setLocalHighscores: (scores: { name: string; score: number; date: string }[]) => void;
+  fetchSpicyLeaderboard: () => Promise<void>;
+  setShowSpicyLeaderboard: (show: boolean) => void;
+}
+
+function ScoreSubmissionForm({
+  chefName,
+  setChefName,
+  submitEmail,
+  setSubmitEmail,
+  currentScore,
+  survivalSecs,
+  selectedColor,
+  localHighscores,
+  setLocalHighscores,
+  fetchSpicyLeaderboard,
+  setShowSpicyLeaderboard,
+}: ScoreSubmissionFormProps) {
+  const [isSubmittingScore, setIsSubmittingScore] = useState<boolean>(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
+  const [hasSkipped, setHasSkipped] = useState<boolean>(false);
+  const hasRecordedLocalScore = useRef<boolean>(false);
+
+  const handleSendScore = async () => {
+    if (isSubmittingScore || submitSuccess) return;
+
+    const cleanNick = chefName.trim().substring(0, 20);
+    if (!cleanNick) {
+      setSubmitError('Por favor ingresa un nombre para el leaderboard (obligatorio).');
+      return;
+    }
+
+    const cleanEmail = submitEmail.trim();
+    if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setSubmitError('Por favor ingresa un correo electrónico válido o déjalo vacío.');
+      return;
+    }
+
+    setIsSubmittingScore(true);
+    setSubmitError(null);
+    try {
+      localStorage.setItem('pizza_hunter_chef_name', cleanNick);
+      setChefName(cleanNick);
+      if (cleanEmail) {
+        localStorage.setItem('pizza_hunter_email', cleanEmail);
+        setSubmitEmail(cleanEmail);
+      } else {
+        localStorage.removeItem('pizza_hunter_email');
+        setSubmitEmail('');
+      }
+
+      // Also save locally (only once per match, avoiding duplicates on retry)
+      if (!hasRecordedLocalScore.current) {
+        const newScore = {
+          name: cleanNick,
+          score: currentScore,
+          date: new Date().toISOString().split('T')[0],
+        };
+        const updated = [...localHighscores, newScore]
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 10);
+        setLocalHighscores(updated);
+        localStorage.setItem('pizza_hunter_local_highscores', JSON.stringify(updated));
+        hasRecordedLocalScore.current = true;
+      }
+
+      // Submit to SpicyCrust API
+      await submitScore({
+        nickname: cleanNick,
+        email: cleanEmail,
+        score: currentScore,
+        metadata: {
+          survivalSecs,
+          color: selectedColor,
+        },
+      });
+
+      setSubmitSuccess(true);
+      fetchSpicyLeaderboard().catch(() => {});
+    } catch (err: any) {
+      const isTimeout = err?.name === 'TimeoutError' || err?.message?.includes('aborted');
+      setSubmitError(isTimeout ? 'Tiempo de espera agotado al conectar con SpicyCrust.' : (err?.message || 'Error al conectar con la API de SpicyCrust.'));
+    } finally {
+      setIsSubmittingScore(false);
+    }
+  };
+
+  if (hasSkipped) {
+    return (
+      <div className="bg-black/30 border border-white/10 rounded-2xl p-3 w-full flex items-center justify-between text-xs font-mono my-2">
+        <span className="text-white/40">Envío de puntaje omitido.</span>
+        <button
+          type="button"
+          onClick={() => setHasSkipped(false)}
+          className="text-amber-400 hover:text-amber-300 underline font-bold cursor-pointer"
+        >
+          Registrar ahora
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      noValidate
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSendScore();
+      }}
+      className="bg-black/40 border border-amber-500/25 rounded-2xl p-3.5 w-full flex flex-col gap-2.5 text-left my-2"
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-amber-400 text-xs font-black font-mono tracking-wider uppercase flex items-center gap-1.5">
+          <Sparkles size={13} />
+          Enviar a Leaderboard
+        </span>
+        <span className="text-[8px] font-mono text-white/50 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+          SpicyCrust API
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <label className="text-white/60 text-[9px] font-mono uppercase tracking-wider flex items-center gap-1">
+              <Crown size={11} className="text-amber-400" />
+              <span>Nombre / Apodo</span> <span className="text-amber-400 font-bold">*</span>
+            </label>
+            <span className="text-[8px] text-amber-500/80 font-mono font-bold">OBLIGATORIO (MÁX. 20)</span>
+          </div>
+          <input
+            type="text"
+            value={chefName}
+            onChange={(e) => {
+              setChefName(e.target.value);
+              if (submitError) setSubmitError(null);
+            }}
+            onBlur={() => {
+              const clean = chefName.trim().substring(0, 20);
+              if (clean) {
+                localStorage.setItem('pizza_hunter_chef_name', clean);
+              }
+            }}
+            maxLength={20}
+            placeholder="Ingresa tu nombre..."
+            className="w-full px-3 py-2.5 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white font-mono text-xs focus:outline-none transition-colors shadow-inner"
+          />
+        </div>
+
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <label className="text-white/60 text-[9px] font-mono uppercase tracking-wider flex items-center gap-1">
+              <Mail size={11} className="text-amber-500/70" />
+              <span>Email de Contacto</span>
+            </label>
+            <span className="text-[8px] text-white/40 font-mono italic">OPCIONAL</span>
+          </div>
+          <input
+            type="email"
+            value={submitEmail}
+            onChange={(e) => {
+              setSubmitEmail(e.target.value);
+              if (submitError) setSubmitError(null);
+            }}
+            onBlur={() => {
+              const clean = submitEmail.trim();
+              if (clean) {
+                localStorage.setItem('pizza_hunter_email', clean);
+              }
+            }}
+            placeholder="tu@email.com (opcional)"
+            className="w-full px-3 py-2.5 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white font-mono text-xs focus:outline-none transition-colors shadow-inner placeholder:text-white/20"
+          />
+          <span className="text-[8px] text-white/40 font-mono block mt-0.5">
+            Opcional: para vincular tu cuenta y reclamar premios en SpicyCrust
+          </span>
+        </div>
+      </div>
+
+      {submitError && (
+        <div className="bg-red-950/60 border border-red-500/40 text-red-300 text-[11px] p-2 rounded-lg font-mono flex items-center gap-2">
+          <X size={14} className="text-red-400 shrink-0" />
+          <span>{submitError}</span>
+        </div>
+      )}
+
+      {submitSuccess ? (
+        <div className="bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs p-2.5 rounded-xl font-mono flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Check size={16} className="text-emerald-400 shrink-0" />
+            <span>¡Puntaje enviado con éxito a SpicyCrust!</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              fetchSpicyLeaderboard();
+              setShowSpicyLeaderboard(true);
+            }}
+            className="text-amber-400 hover:text-amber-300 text-[10px] underline font-bold shrink-0 cursor-pointer"
+          >
+            Ver Ranking
+          </button>
+        </div>
+      ) : (
+        <div className="flex gap-2 pt-0.5">
+          <button
+            type="submit"
+            disabled={isSubmittingScore}
+            className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-neutral-950 font-black rounded-xl text-xs tracking-wider transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+          >
+            {isSubmittingScore ? (
+              <>
+                <Loader2 size={13} className="animate-spin" />
+                <span>ENVIANDO...</span>
+              </>
+            ) : (
+              <>
+                <Send size={13} />
+                <span>ENVIAR PUNTAJE</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const cleanNick = chefName.trim().substring(0, 20);
+              if (cleanNick) {
+                localStorage.setItem('pizza_hunter_chef_name', cleanNick);
+                setChefName(cleanNick);
+              }
+              const cleanEmail = submitEmail.trim();
+              if (cleanEmail) {
+                localStorage.setItem('pizza_hunter_email', cleanEmail);
+              }
+              setHasSkipped(true);
+            }}
+            className="px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white/80 font-bold rounded-xl text-xs tracking-wider transition-all active:scale-95 cursor-pointer border border-white/5"
+          >
+            SALTAR
+          </button>
+        </div>
+      )}
+    </form>
+  );
+}
 
 export function UI() {
   const {
@@ -127,9 +381,9 @@ export function UI() {
   const isAlive = player?.state === 'alive';
   const isDead = player?.state === 'dead';
 
-  // State for config panel
+  // State for config panel & skin customizer
   const [chefName, setChefName] = useState<string>(() => {
-    return localStorage.getItem('pizza_hunter_chef_name') || `Chef ${Math.floor(Math.random() * 900 + 100)}`;
+    return localStorage.getItem('pizza_hunter_chef_name') || '';
   });
   const [selectedSolo, setSelectedSolo] = useState<boolean>(true);
   const [selectedSize, setSelectedSize] = useState<number>(4);
@@ -139,11 +393,8 @@ export function UI() {
   const [selectedColor, setSelectedColor] = useState<string>(() => {
     return localStorage.getItem('pizza_hunter_color') || '#ffa502';
   });
-  const [showStats, setShowStats] = useState<boolean>(false);
-  const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
-  const [showColorDropdown, setShowColorDropdown] = useState<boolean>(false);
+  const [showSkinModal, setShowSkinModal] = useState<boolean>(false);
   const [showHighscoresModal, setShowHighscoresModal] = useState<boolean>(false);
-  const [hasSavedRecord, setHasSavedRecord] = useState<boolean>(false);
   const [localHighscores, setLocalHighscores] = useState<{name: string, score: number, date: string}[]>(() => {
     const saved = localStorage.getItem('pizza_hunter_local_highscores');
     if (saved) {
@@ -169,9 +420,6 @@ export function UI() {
   const [submitEmail, setSubmitEmail] = useState<string>(() => {
     return localStorage.getItem('pizza_hunter_email') || '';
   });
-  const [isSubmittingScore, setIsSubmittingScore] = useState<boolean>(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
   const [showSpicyLeaderboard, setShowSpicyLeaderboard] = useState<boolean>(false);
   const [leaderboardTab, setLeaderboardTab] = useState<'spicy' | 'local'>('spicy');
   const [spicyRanking, setSpicyRanking] = useState<SpicyLeaderboardEntry[]>([]);
@@ -179,6 +427,11 @@ export function UI() {
 
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [isMutedState, setIsMutedState] = useState<boolean>(() => getIsMuted());
+  const [showTimeExpiredScreen, setShowTimeExpiredScreen] = useState(false);
+  const lastPlayedSecond = useRef<number | null>(null);
+  const wasRoundOver = useRef<boolean>(false);
+  const matchStartTime = useRef<number>(Date.now());
+  const survivalDuration = useRef<number>(0);
 
   const currentScore = player ? Math.floor(player.score) : 0;
 
@@ -236,11 +489,15 @@ export function UI() {
   }, []);
 
   const handleJoin = () => {
-    // Save chef name and email
-    const cleanName = chefName.trim().substring(0, 20) || 'Chef';
-    localStorage.setItem('pizza_hunter_chef_name', cleanName);
-    if (submitEmail.trim()) {
-      localStorage.setItem('pizza_hunter_email', submitEmail.trim());
+    // Reset survival duration tracking and set match start time
+    matchStartTime.current = Date.now();
+    survivalDuration.current = 0;
+
+    // Determine player name from state or localStorage, fallback to 'Chef'
+    const savedName = localStorage.getItem('pizza_hunter_chef_name');
+    const cleanName = (chefName.trim() || savedName || 'Chef').substring(0, 20);
+    if (chefName.trim()) {
+      localStorage.setItem('pizza_hunter_chef_name', cleanName);
     }
 
     // Apply store config
@@ -248,8 +505,6 @@ export function UI() {
     if (!selectedSolo) {
       setRoomConfig(selectedSize, selectedPrivate, inputCode);
     }
-
-    setHasSavedRecord(false);
 
     // Join with selected color
     joinGame(cleanName, selectedColor);
@@ -274,12 +529,19 @@ export function UI() {
         // Press A (button 0) to select / play
         const pressedA = gp.buttons[0]?.pressed || false;
         if (pressedA && !lastA) {
-          if (isDead || gameState?.isRoundOver) {
-            handleJoin();
-          } else if (!gameState && !isInLobby) {
-            handleJoin();
-          } else if (isInLobby && lobbyInfo && lobbyInfo.hostId === playerId) {
-            startGameNow();
+          if (showTimeExpiredScreen) {
+            setShowTimeExpiredScreen(false);
+          } else {
+            const isModalOpen = showSkinModal || showHighscoresModal || showSpicyLeaderboard;
+            if (!isModalOpen) {
+              if (isDead || gameState?.isRoundOver) {
+                handleJoin();
+              } else if (!gameState && !isInLobby) {
+                handleJoin();
+              } else if (isInLobby && lobbyInfo && lobbyInfo.hostId === playerId) {
+                startGameNow();
+              }
+            }
           }
         }
         lastA = pressedA;
@@ -306,15 +568,23 @@ export function UI() {
     return () => {
       active = false;
     };
-  }, [playerId, isInLobby, isDead, gameState?.isRoundOver, lobbyInfo, handleJoin, startGameNow]);
+  }, [playerId, isInLobby, isDead, gameState?.isRoundOver, lobbyInfo, handleJoin, startGameNow, showSkinModal, showHighscoresModal, showSpicyLeaderboard, showTimeExpiredScreen]);
 
   // Instant retry keydown shortcut (Space, Enter, R) when dead or round over
   useEffect(() => {
     if (!isDead && !gameState?.isRoundOver) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if typing inside an input element
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+      // Don't trigger if typing inside an input element, interacting with a button, or modal is open
+      if (
+        document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA' ||
+        document.activeElement?.tagName === 'BUTTON' ||
+        showSkinModal ||
+        showHighscoresModal ||
+        showSpicyLeaderboard ||
+        showTimeExpiredScreen
+      ) {
         return;
       }
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'r' || e.key === 'R') {
@@ -325,19 +595,60 @@ export function UI() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDead, gameState?.isRoundOver, handleJoin]);
+  }, [isDead, gameState?.isRoundOver, handleJoin, showSkinModal, showHighscoresModal, showSpicyLeaderboard, showTimeExpiredScreen]);
 
-  const [showTimeExpiredScreen, setShowTimeExpiredScreen] = useState(false);
-  const lastPlayedSecond = useRef<number | null>(null);
-  const wasRoundOver = useRef<boolean>(false);
-  const matchStartTime = useRef<number>(Date.now());
+  // Synchronously freeze survival duration during render if dead or round over
+  if ((isDead || gameState?.isRoundOver) && survivalDuration.current === 0 && matchStartTime.current > 0) {
+    survivalDuration.current = Math.max(1, Math.floor((Date.now() - matchStartTime.current) / 1000));
+  }
 
-  // Track match start time to calculate survival duration
+  // Auto-dismiss the dramatic time-expired banner after 2.5s
+  useEffect(() => {
+    if (showTimeExpiredScreen) {
+      const timer = setTimeout(() => {
+        setShowTimeExpiredScreen(false);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [showTimeExpiredScreen]);
+
+  // Global Escape key to dismiss modals / splash overlays
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showTimeExpiredScreen) {
+          setShowTimeExpiredScreen(false);
+          return;
+        }
+        if (showSkinModal) {
+          setShowSkinModal(false);
+          return;
+        }
+        if (showHighscoresModal || showSpicyLeaderboard) {
+          setShowHighscoresModal(false);
+          setShowSpicyLeaderboard(false);
+          return;
+        }
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [showTimeExpiredScreen, showSkinModal, showHighscoresModal, showSpicyLeaderboard]);
+
+  // Track match start time and freeze duration upon death or round over
   useEffect(() => {
     if (isAlive) {
-      matchStartTime.current = Date.now();
+      survivalDuration.current = 0;
+    } else if (matchStartTime.current > 0 && (isDead || gameState?.isRoundOver)) {
+      if (survivalDuration.current === 0) {
+        survivalDuration.current = Math.max(1, Math.floor((Date.now() - matchStartTime.current) / 1000));
+      }
     }
-  }, [isAlive]);
+  }, [isAlive, isDead, gameState?.isRoundOver]);
+
+  const finalSurvivalSecs = survivalDuration.current > 0
+    ? survivalDuration.current
+    : Math.max(1, Math.floor((Date.now() - matchStartTime.current) / 1000));
 
   // Sound and transition logic for round timer expiry
   useEffect(() => {
@@ -351,8 +662,11 @@ export function UI() {
     if (gameState.isRoundOver) {
       if (!wasRoundOver.current) {
         wasRoundOver.current = true;
-        playRoundOverSound();
-        setShowTimeExpiredScreen(true);
+        // Only trigger round over sound & banner if the player didn't already die
+        if (!isDead) {
+          playRoundOverSound();
+          setShowTimeExpiredScreen(true);
+        }
       }
       lastPlayedSecond.current = null;
       return;
@@ -365,11 +679,11 @@ export function UI() {
     }
 
     const currentSec = Math.ceil(gameState.timeLeft);
-    if (currentSec <= 10 && currentSec > 0 && currentSec !== lastPlayedSecond.current) {
+    if (currentSec <= 10 && currentSec > 0 && currentSec !== lastPlayedSecond.current && !isDead) {
       lastPlayedSecond.current = currentSec;
       playCountdownTickSound(currentSec <= 5);
     }
-  }, [gameState?.timeLeft, gameState?.isRoundOver, playerId]);
+  }, [gameState?.timeLeft, gameState?.isRoundOver, playerId, isDead]);
 
   const handleOpenNewTab = () => {
     window.open(window.location.href, '_blank');
@@ -415,7 +729,7 @@ export function UI() {
 
       {/* Massive Neon Countdown Overlay (Final 10 Seconds) */}
       <AnimatePresence>
-        {playerId && gameState && !gameState.isRoundOver && gameState.timeLeft !== undefined && gameState.timeLeft <= 10 && gameState.timeLeft > 0 && (
+        {playerId && gameState && !isDead && !gameState.isRoundOver && gameState.timeLeft !== undefined && gameState.timeLeft <= 10 && gameState.timeLeft > 0 && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-30 overflow-hidden">
             <motion.div
               key={Math.ceil(gameState.timeLeft)}
@@ -449,7 +763,8 @@ export function UI() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 pointer-events-auto bg-black/90 backdrop-blur-lg flex flex-col items-center justify-center z-50 p-6"
+            onClick={() => setShowTimeExpiredScreen(false)}
+            className="absolute inset-0 pointer-events-auto bg-black/90 backdrop-blur-lg flex flex-col items-center justify-center z-50 p-6 cursor-pointer"
           >
             <motion.div
               initial={{ scale: 0.4, rotate: -5 }}
@@ -739,7 +1054,7 @@ export function UI() {
             )}
 
             {/* ROUND OVER RESULTS SCREEN */}
-            {gameState?.isRoundOver && (
+            {!isDead && gameState?.isRoundOver && (
               <motion.div
                 key="round-over-screen"
                 initial={{ scale: 0.95, y: 15 }}
@@ -840,17 +1155,32 @@ export function UI() {
                   )}
                 </div>
 
+                {/* SpicyCrust Score Submission Form */}
+                <ScoreSubmissionForm
+                  chefName={chefName}
+                  setChefName={setChefName}
+                  submitEmail={submitEmail}
+                  setSubmitEmail={setSubmitEmail}
+                  currentScore={currentScore}
+                  survivalSecs={finalSurvivalSecs}
+                  selectedColor={selectedColor}
+                  localHighscores={localHighscores}
+                  setLocalHighscores={setLocalHighscores}
+                  fetchSpicyLeaderboard={fetchSpicyLeaderboard}
+                  setShowSpicyLeaderboard={setShowSpicyLeaderboard}
+                />
+
                 {/* Actions */}
                 <div className="w-full flex flex-col gap-2.5">
                   <button
                     onClick={handleJoin}
-                    className="w-full py-4 bg-amber-500 text-neutral-950 font-black rounded-xl hover:bg-amber-400 active:scale-95 transition-all text-base tracking-wider"
+                    className="w-full py-4 bg-amber-500 text-neutral-950 font-black rounded-xl hover:bg-amber-400 active:scale-95 transition-all text-base tracking-wider cursor-pointer"
                   >
                     VOLVER A REPARTIR
                   </button>
                   <button
                     onClick={quitGame}
-                    className="w-full py-3 bg-white/5 text-white/80 font-bold rounded-xl hover:bg-white/10 active:scale-95 transition-all text-sm"
+                    className="w-full py-3 bg-white/5 text-white/80 font-bold rounded-xl hover:bg-white/10 active:scale-95 transition-all text-sm cursor-pointer"
                   >
                     SALIR AL MENÚ
                   </button>
@@ -859,66 +1189,7 @@ export function UI() {
             )}
 
             {/* GAME OVER SCREEN */}
-            {isDead && !gameState?.isRoundOver && (() => {
-              const survivalSecs = Math.max(1, Math.floor((Date.now() - matchStartTime.current) / 1000));
-
-              const handleSendScore = async () => {
-                const cleanNick = chefName.trim().substring(0, 20);
-                if (!cleanNick) {
-                  setSubmitError('Por favor ingresa un nombre para el leaderboard.');
-                  return;
-                }
-
-                const cleanEmail = submitEmail.trim();
-                if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-                  setSubmitError('Por favor ingresa un correo electrónico válido o déjalo vacío.');
-                  return;
-                }
-
-                setIsSubmittingScore(true);
-                setSubmitError(null);
-                try {
-                  localStorage.setItem('pizza_hunter_chef_name', cleanNick);
-                  if (cleanEmail) {
-                    localStorage.setItem('pizza_hunter_email', cleanEmail);
-                  }
-
-                  // Also save locally
-                  const newScore = {
-                    name: cleanNick,
-                    score: currentScore,
-                    date: new Date().toISOString().split('T')[0],
-                  };
-                  const updated = [...localHighscores, newScore]
-                    .sort((a, b) => b.score - a.score)
-                    .slice(0, 10);
-                  setLocalHighscores(updated);
-                  localStorage.setItem('pizza_hunter_local_highscores', JSON.stringify(updated));
-
-                  // Submit to SpicyCrust API
-                  await submitScore({
-                    nickname: cleanNick,
-                    email: cleanEmail,
-                    score: currentScore,
-                    metadata: {
-                      survivalSecs,
-                      color: selectedColor,
-                    },
-                  });
-
-                  setSubmitSuccess(true);
-                  // Load latest rankings and transition to leaderboard
-                  await fetchSpicyLeaderboard();
-                  setTimeout(() => {
-                    setShowSpicyLeaderboard(true);
-                  }, 600);
-                } catch (err: any) {
-                  setSubmitError(err?.message || 'Error al conectar con la API de SpicyCrust.');
-                } finally {
-                  setIsSubmittingScore(false);
-                }
-              };
-
+            {isDead && (() => {
               return (
                 <motion.div
                   initial={{ scale: 0.9, y: 20, opacity: 0 }}
@@ -953,7 +1224,7 @@ export function UI() {
                       
                       <div className="flex flex-col items-center justify-center p-1 border-x border-white/10">
                         <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider block mb-0.5">Tiempo</span>
-                        <span className="text-emerald-400 font-mono font-extrabold text-xl">{survivalSecs}s</span>
+                        <span className="text-emerald-400 font-mono font-extrabold text-xl">{finalSurvivalSecs}s</span>
                       </div>
 
                       <div className="flex flex-col items-center justify-center p-1">
@@ -963,103 +1234,19 @@ export function UI() {
                     </div>
 
                     {/* SpicyCrust Score Submission Form */}
-                    <div className="bg-black/40 border border-amber-500/25 rounded-2xl p-3.5 w-full flex flex-col gap-2.5 text-left mb-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-amber-400 text-xs font-black font-mono tracking-wider uppercase flex items-center gap-1.5">
-                          <Sparkles size={13} />
-                          Enviar a Leaderboard
-                        </span>
-                        <span className="text-[8px] font-mono text-white/50 bg-white/5 px-2 py-0.5 rounded border border-white/5">
-                          SpicyCrust API
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col gap-2.5">
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <label className="text-white/60 text-[9px] font-mono uppercase tracking-wider flex items-center gap-1">
-                              <Crown size={11} className="text-amber-400" />
-                              <span>Nombre / Apodo</span> <span className="text-amber-400 font-bold">*</span>
-                            </label>
-                            <span className="text-[8px] text-amber-500/80 font-mono font-bold">OBLIGATORIO</span>
-                          </div>
-                          <input
-                            type="text"
-                            value={chefName}
-                            onChange={(e) => setChefName(e.target.value)}
-                            maxLength={20}
-                            placeholder="Ingresa tu nombre..."
-                            className="w-full px-3 py-2.5 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white font-mono text-xs focus:outline-none transition-colors shadow-inner"
-                          />
-                        </div>
-
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <label className="text-white/60 text-[9px] font-mono uppercase tracking-wider flex items-center gap-1">
-                              <Mail size={11} className="text-amber-500/70" />
-                              <span>Email de Contacto</span>
-                            </label>
-                            <span className="text-[8px] text-white/40 font-mono italic">OPCIONAL</span>
-                          </div>
-                          <input
-                            type="email"
-                            value={submitEmail}
-                            onChange={(e) => setSubmitEmail(e.target.value)}
-                            placeholder="tu@email.com (opcional)"
-                            className="w-full px-3 py-2.5 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white font-mono text-xs focus:outline-none transition-colors shadow-inner placeholder:text-white/20"
-                          />
-                          <span className="text-[8px] text-white/40 font-mono block mt-1">
-                            Opcional: para vincular tu cuenta y reclamar premios en SpicyCrust
-                          </span>
-                        </div>
-                      </div>
-
-                      {submitError && (
-                        <div className="bg-red-950/60 border border-red-500/40 text-red-300 text-[11px] p-2 rounded-lg font-mono flex items-center gap-2">
-                          <X size={14} className="text-red-400 shrink-0" />
-                          <span>{submitError}</span>
-                        </div>
-                      )}
-
-                      {submitSuccess && (
-                        <div className="bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-[11px] p-2 rounded-lg font-mono flex items-center gap-2">
-                          <Check size={14} className="text-emerald-400 shrink-0" />
-                          <span>¡Puntaje enviado con éxito a SpicyCrust!</span>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 pt-0.5">
-                        <button
-                          type="button"
-                          onClick={handleSendScore}
-                          disabled={isSubmittingScore || submitSuccess}
-                          className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-neutral-950 font-black rounded-xl text-xs tracking-wider transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-                        >
-                          {isSubmittingScore ? (
-                            <>
-                              <Loader2 size={13} className="animate-spin" />
-                              <span>ENVIANDO...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Send size={13} />
-                              <span>ENVIAR PUNTAJE</span>
-                            </>
-                          )}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            fetchSpicyLeaderboard();
-                            setShowSpicyLeaderboard(true);
-                          }}
-                          className="px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white/80 font-bold rounded-xl text-xs tracking-wider transition-all active:scale-95 cursor-pointer border border-white/5"
-                        >
-                          SALTAR
-                        </button>
-                      </div>
-                    </div>
+                    <ScoreSubmissionForm
+                      chefName={chefName}
+                      setChefName={setChefName}
+                      submitEmail={submitEmail}
+                      setSubmitEmail={setSubmitEmail}
+                      currentScore={currentScore}
+                      survivalSecs={finalSurvivalSecs}
+                      selectedColor={selectedColor}
+                      localHighscores={localHighscores}
+                      setLocalHighscores={setLocalHighscores}
+                      fetchSpicyLeaderboard={fetchSpicyLeaderboard}
+                      setShowSpicyLeaderboard={setShowSpicyLeaderboard}
+                    />
                   </div>
 
                   {/* Instant Revenge and Menu Actions */}
@@ -1090,7 +1277,7 @@ export function UI() {
             {/* MAIN MENU / LANDING PAGE */}
             {!gameState && !isInLobby && (
               <div 
-                className="fixed inset-0 flex flex-col justify-between pointer-events-auto bg-[#030303] overflow-hidden p-6 md:p-8 z-40 select-none touch-none"
+                className="fixed inset-0 flex flex-col justify-between pointer-events-auto bg-[#030303] overflow-y-auto p-6 md:p-8 z-40 select-none"
                 style={{
                   backgroundImage: `linear-gradient(rgba(3, 3, 3, 0.75), rgba(3, 3, 3, 0.85)), url(/pizza_arena_bg.png)`,
                   backgroundSize: 'cover',
@@ -1136,11 +1323,11 @@ export function UI() {
 
                     <div className="flex flex-col sm:flex-row gap-3 w-full md:w-fit z-10">
                       <button
-                        onClick={() => setShowConfigModal(true)}
+                        onClick={handleJoin}
                         className="w-full sm:w-52 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-black rounded-2xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-2 border-t border-white/20 shadow-2xl shadow-amber-500/20 group cursor-pointer"
                       >
+                        <Play size={18} fill="currentColor" />
                         <span>JUGAR AHORA</span>
-                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                       </button>
 
                       <button
@@ -1158,9 +1345,20 @@ export function UI() {
 
                   {/* Right Column: Vespa Showcase Holographic Card */}
                   <div className="md:col-span-6 flex flex-col items-center justify-center relative select-none bg-black/45 border border-white/10 rounded-3xl backdrop-blur-md p-4 md:p-6 w-full max-w-sm mx-auto shadow-2xl">
-                    <span className="text-[10px] font-black text-amber-500 tracking-widest uppercase font-mono mb-1">
-                      ⚡ TU REPARTIDOR 3D ⚡
-                    </span>
+                    <div className="w-full flex items-center justify-between mb-1 px-1">
+                      <span className="text-[10px] font-black text-amber-500 tracking-widest uppercase font-mono">
+                        ⚡ TU REPARTIDOR 3D ⚡
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowSkinModal(true)}
+                        className="flex items-center gap-1.5 text-[10px] font-mono text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 rounded-full border border-amber-500/20 transition-all cursor-pointer"
+                        title="Personalizar color de la Vespa"
+                      >
+                        <Palette size={12} />
+                        <span>Personalizar Vespa</span>
+                      </button>
+                    </div>
                     
                     <div className="relative w-full flex items-center justify-center">
                       {/* Futuristic showroom base */}
@@ -1170,6 +1368,37 @@ export function UI() {
                       </div>
                       {/* Floating Vespa */}
                       <VespaShowcase color={selectedColor} />
+                    </div>
+
+                    {/* Quick Color Swatches and Customize Action */}
+                    <div className="flex items-center justify-between w-full mt-2 pt-2.5 border-t border-white/10">
+                      <div className="flex items-center gap-1.5">
+                        {DRIVER_COLORS.map((c) => (
+                          <button
+                            key={c.hex}
+                            type="button"
+                            onClick={() => {
+                              setSelectedColor(c.hex);
+                              localStorage.setItem('pizza_hunter_color', c.hex);
+                            }}
+                            className={`w-5 h-5 rounded-full border transition-all cursor-pointer hover:scale-125 ${
+                              selectedColor === c.hex
+                                ? 'border-amber-400 ring-2 ring-amber-400/50 scale-110 shadow-lg'
+                                : 'border-white/30 opacity-70 hover:opacity-100'
+                            } ${c.bg}`}
+                            title={`Color: ${c.name}`}
+                          />
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowSkinModal(true)}
+                        className="flex items-center gap-1 text-[11px] font-mono text-white/70 hover:text-white transition-colors cursor-pointer"
+                      >
+                        <span>{DRIVER_COLORS.find(c => c.hex === selectedColor)?.name}</span>
+                        <ChevronDown size={12} />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1181,171 +1410,90 @@ export function UI() {
               </div>
             )}
 
-            {/* CONFIGURATION POPUP MODAL */}
-            {!gameState && !isInLobby && showConfigModal && (
+            {/* VESPA SKIN CUSTOMIZATION MODAL */}
+            {!gameState && !isInLobby && showSkinModal && (
               <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-auto">
                 {/* Backdrop Blur Overlay */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  onClick={() => setShowConfigModal(false)}
-                  className="absolute inset-0 bg-black/75 backdrop-blur-md cursor-pointer"
+                  onClick={() => setShowSkinModal(false)}
+                  className="absolute inset-0 bg-black/80 backdrop-blur-md cursor-pointer"
                 />
 
                 {/* Modal Container */}
                 <motion.div
                   initial={{ scale: 0.95, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="bg-neutral-900 border border-white/10 rounded-3xl p-6 md:p-8 max-w-sm w-full relative z-10 flex flex-col gap-5 shadow-2xl overflow-y-auto max-h-[95vh]"
+                  className="bg-neutral-900 border border-amber-500/30 rounded-3xl p-6 md:p-7 max-w-sm w-full relative z-10 flex flex-col gap-4 shadow-2xl"
                 >
                   {/* Modal Header */}
                   <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-black text-amber-500 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                      <Crown size={14} />
-                      Configurar Repartidor
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+                        <Palette size={18} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-amber-500 uppercase tracking-wider font-mono">
+                          Personalizar Vespa
+                        </h3>
+                        <span className="text-[10px] text-white/50 font-mono">
+                          Pintura y acabado de la carrocería
+                        </span>
+                      </div>
+                    </div>
                     <button
-                      onClick={() => setShowConfigModal(false)}
+                      type="button"
+                      onClick={() => setShowSkinModal(false)}
                       className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all cursor-pointer"
                     >
-                      <X size={14} />
+                      <X size={16} />
                     </button>
                   </div>
 
                   <div className="h-px bg-white/10 w-full" />
 
-                  {/* Nickname Input */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-white/60 text-[9px] font-mono uppercase tracking-wider flex items-center gap-1">
-                        <Crown size={11} className="text-amber-400" />
-                        <span>Nombre del Repartidor</span> <span className="text-amber-400 font-bold">*</span>
-                      </label>
-                      <span className="text-[8px] text-amber-500/80 font-mono font-bold">OBLIGATORIO</span>
-                    </div>
-                    <input
-                      type="text"
-                      value={chefName}
-                      onChange={(e) => setChefName(e.target.value)}
-                      maxLength={20}
-                      className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-sm font-bold font-mono focus:outline-none focus:border-amber-500 transition-colors shadow-inner"
-                      placeholder="Tu apodo..."
-                    />
-                  </div>
+                  {/* 3D Preview inside modal */}
+                  <ChefPreview3D color={selectedColor} />
 
-                  {/* Email Input */}
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex justify-between items-center">
-                      <label className="text-white/60 text-[9px] font-mono uppercase tracking-wider flex items-center gap-1">
-                        <Mail size={11} className="text-amber-500/70" />
-                        <span>Email de Contacto</span>
-                      </label>
-                      <span className="text-[8px] text-white/40 font-mono italic">OPCIONAL</span>
-                    </div>
-                    <input
-                      type="email"
-                      value={submitEmail}
-                      onChange={(e) => {
-                        setSubmitEmail(e.target.value);
-                        localStorage.setItem('pizza_hunter_email', e.target.value.trim());
-                      }}
-                      className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-sm font-mono focus:outline-none focus:border-amber-500 transition-colors shadow-inner placeholder:text-white/20"
-                      placeholder="tu@email.com (opcional)"
-                    />
-                    <span className="text-[9px] text-white/40 font-mono">
-                      Vincula tu cuenta para reclamar premios en SpicyCrust
-                    </span>
-                  </div>
-
-                  {/* Vespa Design Dropdown */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-white/40 text-[9px] font-mono uppercase tracking-wider">
-                      Pintura Vespa (Skin)
-                    </label>
-                    
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setShowColorDropdown(!showColorDropdown)}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-amber-500 transition-colors shadow-inner cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className={`w-3.5 h-3.5 rounded-full border border-white/20 shadow-inner ${DRIVER_COLORS.find(c => c.hex === selectedColor)?.bg}`} />
-                          <span>{DRIVER_COLORS.find(c => c.hex === selectedColor)?.name}</span>
-                        </div>
-                        <ChevronDown size={14} className={`text-white/60 transition-transform ${showColorDropdown ? 'rotate-180' : ''}`} />
-                      </button>
-
-                      {showColorDropdown && (
-                        <>
-                          <div className="fixed inset-0 z-20" onClick={() => setShowColorDropdown(false)} />
-                          <div className="absolute left-0 right-0 mt-2 p-2 bg-neutral-900 border border-white/10 rounded-xl shadow-2xl z-30 grid grid-cols-3 gap-2 animate-fadeIn">
-                            {DRIVER_COLORS.map((c) => (
-                              <button
-                                key={c.hex}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedColor(c.hex);
-                                  localStorage.setItem('pizza_hunter_color', c.hex);
-                                  setShowColorDropdown(false);
-                                }}
-                                className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border transition-all cursor-pointer ${
-                                  selectedColor === c.hex
-                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                                    : 'bg-black/20 border-transparent text-white/60 hover:text-white hover:bg-white/5'
-                                }`}
-                              >
-                                <span className={`w-5 h-5 rounded-full border border-white/20 shadow-inner ${c.bg}`} />
-                                <span className="text-[9px] font-mono truncate max-w-full">{c.name}</span>
-                              </button>
-                            ))}
+                  {/* Color Selection Swatches Grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {DRIVER_COLORS.map((c) => {
+                      const isSelected = selectedColor === c.hex;
+                      return (
+                        <button
+                          key={c.hex}
+                          type="button"
+                          onClick={() => {
+                            setSelectedColor(c.hex);
+                            localStorage.setItem('pizza_hunter_color', c.hex);
+                          }}
+                          className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-500/15 border-amber-500 text-amber-300 shadow-md shadow-amber-500/10'
+                              : 'bg-black/40 border-white/5 text-white/70 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <div className="relative">
+                            <span className={`block w-6 h-6 rounded-full border border-white/30 shadow-inner ${c.bg}`} />
+                            {isSelected && (
+                              <span className="absolute inset-0 flex items-center justify-center text-white text-xs drop-shadow">
+                                <Check size={12} strokeWidth={3} />
+                              </span>
+                            )}
                           </div>
-                        </>
-                      )}
-                    </div>
+                          <span className="text-[10px] font-mono font-bold truncate max-w-full">{c.name}</span>
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  {/* Mode Selector Tabs */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-white/40 text-[9px] font-mono uppercase tracking-wider">Modo de Juego</label>
-                    <div className="grid grid-cols-2 gap-2 bg-black/40 p-1 rounded-xl border border-white/5">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSolo(true)}
-                        className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
-                          selectedSolo
-                            ? 'bg-amber-500 text-neutral-950 shadow-md shadow-amber-500/10'
-                            : 'text-white/60 hover:text-white hover:bg-white/5'
-                        }`}
-                      >
-                        <Bot size={14} />
-                        <span>SOLO (Práctica)</span>
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        className="relative flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold font-mono text-white/30 bg-black/20 overflow-hidden cursor-not-allowed"
-                      >
-                        <Users size={14} />
-                        <span>MULTIJUGADOR</span>
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
-                          <span className="text-[8px] bg-red-600/90 text-white px-2 py-0.5 rounded font-black tracking-widest border border-red-500/50 shadow-lg rotate-[-5deg]">SOON</span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Action Play Button */}
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowConfigModal(false);
-                      handleJoin();
-                    }}
-                    className="w-full py-3.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-black rounded-xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-2 border-t border-white/20 shadow-xl shadow-amber-500/10 cursor-pointer"
+                    onClick={() => setShowSkinModal(false)}
+                    className="w-full py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 active:scale-95 text-neutral-950 font-black rounded-xl text-xs font-mono tracking-wider transition-all shadow-lg shadow-amber-500/20 cursor-pointer"
                   >
-                    <span>¡INICIAR ENTRADAS!</span>
-                    <ArrowRight size={18} />
+                    LISTO
                   </button>
                 </motion.div>
               </div>
@@ -1529,7 +1677,7 @@ export function UI() {
 
                   {/* Actions */}
                   <div className="flex gap-2 pt-1">
-                    {isDead && (
+                    {(isDead || gameState?.isRoundOver) && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1549,7 +1697,7 @@ export function UI() {
                         setShowHighscoresModal(false);
                         setShowSpicyLeaderboard(false);
                       }}
-                      className={`${isDead ? 'px-5' : 'w-full'} py-3 bg-white/10 hover:bg-white/15 text-white/90 font-bold rounded-xl active:scale-95 transition-all text-xs cursor-pointer border border-white/5`}
+                      className={`${(isDead || gameState?.isRoundOver) ? 'px-5' : 'w-full'} py-3 bg-white/10 hover:bg-white/15 text-white/90 font-bold rounded-xl active:scale-95 transition-all text-xs cursor-pointer border border-white/5`}
                     >
                       CERRAR
                     </button>

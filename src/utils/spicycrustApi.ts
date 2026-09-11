@@ -38,6 +38,19 @@ export async function getActiveSeason(): Promise<string> {
   return 'season-01';
 }
 
+function getPlayerExternalId(): string {
+  try {
+    let id = localStorage.getItem('pizza_hunter_player_id');
+    if (!id) {
+      id = 'player-' + Math.random().toString(36).substring(2, 10) + '-' + Date.now();
+      localStorage.setItem('pizza_hunter_player_id', id);
+    }
+    return id;
+  } catch {
+    return 'player-' + Date.now();
+  }
+}
+
 export async function submitScore({
   nickname,
   email = '',
@@ -50,21 +63,27 @@ export async function submitScore({
   metadata?: Record<string, any>;
 }) {
   const seasonSlug = await getActiveSeason();
+  const payload: Record<string, any> = {
+    game_slug: GAME_SLUG,
+    season_slug: seasonSlug,
+    player_external_id: getPlayerExternalId(),
+    nickname,
+    score,
+    metadata,
+  };
+
+  const cleanEmail = email ? email.trim() : '';
+  if (cleanEmail) {
+    payload.email = cleanEmail;
+  }
+
   const res = await fetch(`${API_BASE}/scores`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Game-Key': GAME_KEY,
     },
-    body: JSON.stringify({
-      game_slug: GAME_SLUG,
-      season_slug: seasonSlug,
-      player_external_id: 'player-' + Date.now(),
-      email,
-      nickname,
-      score,
-      metadata,
-    }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(8000),
   });
 

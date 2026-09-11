@@ -1300,12 +1300,20 @@ export function UI() {
                     <span className="text-2xl">🍕</span>
                     <h1 className="text-xl font-black text-white tracking-widest font-mono">SLICE HUNTER</h1>
                   </div>
-                  {highestScore > 0 && (
-                    <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-1.5 text-xs text-amber-400 font-mono font-black tracking-wide">
-                      <Trophy size={14} className="fill-amber-500/10" />
-                      <span>RÉCORD: {highestScore} PIZZAS</span>
-                    </div>
-                  )}
+                  
+                  {/* Interactive Header Badge */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchSpicyLeaderboard();
+                      setShowHighscoresModal(true);
+                    }}
+                    className="flex items-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 hover:border-amber-500/40 rounded-full px-4 py-1.5 text-xs text-amber-400 font-mono font-black tracking-wide transition-all active:scale-95 cursor-pointer shadow-lg shadow-amber-500/5 group"
+                    title="Ver Salón de la Fama y Ranking Global"
+                  >
+                    <Trophy size={14} className="fill-amber-500/20 group-hover:scale-110 transition-transform" />
+                    <span>{highestScore > 0 ? `TU RÉCORD: ${highestScore} PIZZAS` : '🌍 RANKING SPICYCRUST'}</span>
+                  </button>
                 </div>
 
                 {/* Main Body Grid */}

@@ -1369,20 +1369,9 @@ export function UI() {
 
                   {/* Right Column: Vespa Showcase Holographic Card */}
                   <div className="md:col-span-6 flex flex-col items-center justify-center relative select-none bg-black/45 border border-white/10 rounded-3xl backdrop-blur-md p-4 md:p-6 w-full max-w-sm mx-auto shadow-2xl">
-                    <div className="w-full flex items-center justify-between mb-1 px-1">
-                      <span className="text-[10px] font-black text-amber-500 tracking-widest uppercase font-mono">
-                        ⚡ TU REPARTIDOR 3D ⚡
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowSkinModal(true)}
-                        className="flex items-center gap-1.5 text-[10px] font-mono text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 rounded-full border border-amber-500/20 transition-all cursor-pointer"
-                        title="Personalizar color de la Vespa"
-                      >
-                        <Palette size={12} />
-                        <span>Personalizar Vespa</span>
-                      </button>
-                    </div>
+                    <span className="text-[10px] font-black text-amber-500 tracking-widest uppercase font-mono mb-1">
+                      ⚡ TU REPARTIDOR 3D ⚡
+                    </span>
                     
                     <div className="relative w-full flex items-center justify-center">
                       {/* Futuristic showroom base */}

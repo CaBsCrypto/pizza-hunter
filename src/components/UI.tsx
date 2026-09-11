@@ -236,9 +236,12 @@ export function UI() {
   }, []);
 
   const handleJoin = () => {
-    // Save chef name
-    const cleanName = chefName.trim().substring(0, 14) || 'Chef';
+    // Save chef name and email
+    const cleanName = chefName.trim().substring(0, 20) || 'Chef';
     localStorage.setItem('pizza_hunter_chef_name', cleanName);
+    if (submitEmail.trim()) {
+      localStorage.setItem('pizza_hunter_email', submitEmail.trim());
+    }
 
     // Apply store config
     setSoloMode(selectedSolo);
@@ -865,12 +868,19 @@ export function UI() {
                   setSubmitError('Por favor ingresa un nombre para el leaderboard.');
                   return;
                 }
+
+                const cleanEmail = submitEmail.trim();
+                if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+                  setSubmitError('Por favor ingresa un correo electrónico válido o déjalo vacío.');
+                  return;
+                }
+
                 setIsSubmittingScore(true);
                 setSubmitError(null);
                 try {
                   localStorage.setItem('pizza_hunter_chef_name', cleanNick);
-                  if (submitEmail.trim()) {
-                    localStorage.setItem('pizza_hunter_email', submitEmail.trim());
+                  if (cleanEmail) {
+                    localStorage.setItem('pizza_hunter_email', cleanEmail);
                   }
 
                   // Also save locally
@@ -888,7 +898,7 @@ export function UI() {
                   // Submit to SpicyCrust API
                   await submitScore({
                     nickname: cleanNick,
-                    email: submitEmail.trim(),
+                    email: cleanEmail,
                     score: currentScore,
                     metadata: {
                       survivalSecs,
@@ -964,32 +974,43 @@ export function UI() {
                         </span>
                       </div>
 
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-2.5">
                         <div>
-                          <label className="text-white/50 text-[9px] font-mono uppercase tracking-wider block mb-1">
-                            Nombre / Apodo <span className="text-amber-400">*</span>
-                          </label>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-white/60 text-[9px] font-mono uppercase tracking-wider flex items-center gap-1">
+                              <Crown size={11} className="text-amber-400" />
+                              <span>Nombre / Apodo</span> <span className="text-amber-400 font-bold">*</span>
+                            </label>
+                            <span className="text-[8px] text-amber-500/80 font-mono font-bold">OBLIGATORIO</span>
+                          </div>
                           <input
                             type="text"
                             value={chefName}
                             onChange={(e) => setChefName(e.target.value)}
                             maxLength={20}
                             placeholder="Ingresa tu nombre..."
-                            className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white font-mono text-xs focus:outline-none transition-colors"
+                            className="w-full px-3 py-2.5 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white font-mono text-xs focus:outline-none transition-colors shadow-inner"
                           />
                         </div>
 
                         <div>
-                          <label className="text-white/50 text-[9px] font-mono uppercase tracking-wider block mb-1">
-                            Email (Opcional)
-                          </label>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-white/60 text-[9px] font-mono uppercase tracking-wider flex items-center gap-1">
+                              <Mail size={11} className="text-amber-500/70" />
+                              <span>Email de Contacto</span>
+                            </label>
+                            <span className="text-[8px] text-white/40 font-mono italic">OPCIONAL</span>
+                          </div>
                           <input
                             type="email"
                             value={submitEmail}
                             onChange={(e) => setSubmitEmail(e.target.value)}
                             placeholder="tu@email.com (opcional)"
-                            className="w-full px-3 py-2 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white font-mono text-xs focus:outline-none transition-colors"
+                            className="w-full px-3 py-2.5 bg-black/60 border border-white/15 focus:border-amber-400 rounded-xl text-white font-mono text-xs focus:outline-none transition-colors shadow-inner placeholder:text-white/20"
                           />
+                          <span className="text-[8px] text-white/40 font-mono block mt-1">
+                            Opcional: para vincular tu cuenta y reclamar premios en SpicyCrust
+                          </span>
                         </div>
                       </div>
 
@@ -1195,17 +1216,45 @@ export function UI() {
 
                   {/* Nickname Input */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-white/40 text-[9px] font-mono uppercase tracking-wider">
-                      Nombre del Repartidor
-                    </label>
+                    <div className="flex justify-between items-center">
+                      <label className="text-white/60 text-[9px] font-mono uppercase tracking-wider flex items-center gap-1">
+                        <Crown size={11} className="text-amber-400" />
+                        <span>Nombre del Repartidor</span> <span className="text-amber-400 font-bold">*</span>
+                      </label>
+                      <span className="text-[8px] text-amber-500/80 font-mono font-bold">OBLIGATORIO</span>
+                    </div>
                     <input
                       type="text"
                       value={chefName}
                       onChange={(e) => setChefName(e.target.value)}
-                      maxLength={14}
+                      maxLength={20}
                       className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-sm font-bold font-mono focus:outline-none focus:border-amber-500 transition-colors shadow-inner"
                       placeholder="Tu apodo..."
                     />
+                  </div>
+
+                  {/* Email Input */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-white/60 text-[9px] font-mono uppercase tracking-wider flex items-center gap-1">
+                        <Mail size={11} className="text-amber-500/70" />
+                        <span>Email de Contacto</span>
+                      </label>
+                      <span className="text-[8px] text-white/40 font-mono italic">OPCIONAL</span>
+                    </div>
+                    <input
+                      type="email"
+                      value={submitEmail}
+                      onChange={(e) => {
+                        setSubmitEmail(e.target.value);
+                        localStorage.setItem('pizza_hunter_email', e.target.value.trim());
+                      }}
+                      className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-sm font-mono focus:outline-none focus:border-amber-500 transition-colors shadow-inner placeholder:text-white/20"
+                      placeholder="tu@email.com (opcional)"
+                    />
+                    <span className="text-[9px] text-white/40 font-mono">
+                      Vincula tu cuenta para reclamar premios en SpicyCrust
+                    </span>
                   </div>
 
                   {/* Vespa Design Dropdown */}

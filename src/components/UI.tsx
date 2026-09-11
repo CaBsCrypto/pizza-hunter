@@ -1321,25 +1321,49 @@ export function UI() {
                       </p>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-fit z-10">
-                      <button
-                        onClick={handleJoin}
-                        className="w-full sm:w-52 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-black rounded-2xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-2 border-t border-white/20 shadow-2xl shadow-amber-500/20 group cursor-pointer"
-                      >
-                        <Play size={18} fill="currentColor" />
-                        <span>JUGAR AHORA</span>
-                      </button>
+                    <div className="flex flex-col gap-3 w-full md:w-fit z-10">
+                      <div className="flex flex-col sm:flex-row gap-3 w-full">
+                        <button
+                          onClick={handleJoin}
+                          className="w-full sm:w-52 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-black rounded-2xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-2 border-t border-white/20 shadow-2xl shadow-amber-500/20 group cursor-pointer"
+                        >
+                          <Play size={18} fill="currentColor" />
+                          <span>JUGAR AHORA</span>
+                        </button>
 
-                      <button
-                        onClick={() => {
-                          fetchSpicyLeaderboard();
-                          setShowHighscoresModal(true);
-                        }}
-                        className="w-full sm:w-44 py-4 bg-neutral-900 border border-white/10 hover:bg-neutral-800 text-white font-bold rounded-2xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+                        <button
+                          onClick={() => {
+                            fetchSpicyLeaderboard();
+                            setShowHighscoresModal(true);
+                          }}
+                          className="w-full sm:w-44 py-4 bg-neutral-900 border border-white/10 hover:bg-neutral-800 text-white font-bold rounded-2xl active:scale-[0.98] transition-all text-base tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Award size={18} className="text-yellow-500" />
+                          <span>RÉCORDS</span>
+                        </button>
+                      </div>
+
+                      {/* SpicyCrust Link Button */}
+                      <a
+                        href="https://spicycrust.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-3 px-4 bg-gradient-to-r from-red-950/50 via-neutral-900/80 to-neutral-900/80 hover:from-red-900/50 hover:to-neutral-800 border border-red-500/25 hover:border-amber-500/40 text-white rounded-2xl transition-all flex items-center justify-between gap-3 group shadow-lg shadow-black/40 active:scale-[0.99] cursor-pointer"
                       >
-                        <Award size={18} className="text-yellow-500" />
-                        <span>RÉCORDS</span>
-                      </button>
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-xl">🌶️</span>
+                          <div className="flex flex-col text-left">
+                            <span className="text-xs font-black font-mono uppercase tracking-wider text-amber-400 group-hover:text-amber-300 flex items-center gap-1.5">
+                              <span>SPICYCRUST.COM</span>
+                              <span className="text-[8px] bg-red-500/20 text-red-400 px-1.5 py-0.2 rounded border border-red-500/30">ARCADE</span>
+                            </span>
+                            <span className="text-[10px] text-white/50 font-sans">
+                              Visita la taberna oficial y descubre más juegos
+                            </span>
+                          </div>
+                        </div>
+                        <ExternalLink size={16} className="text-white/40 group-hover:text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0" />
+                      </a>
                     </div>
                   </div>
 

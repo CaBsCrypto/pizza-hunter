@@ -427,12 +427,6 @@ export function UI() {
 
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [isMutedState, setIsMutedState] = useState<boolean>(() => getIsMuted());
-  const [isLeaderboardCollapsed, setIsLeaderboardCollapsed] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth < 768;
-    }
-    return false;
-  });
   const [showTimeExpiredScreen, setShowTimeExpiredScreen] = useState(false);
   const lastPlayedSecond = useRef<number | null>(null);
   const wasRoundOver = useRef<boolean>(false);
@@ -880,71 +874,43 @@ export function UI() {
 
       {/* In-Game Live Leaderboard */}
       {isAlive && gameState && gameState.leaderboard.length > 0 && (
-        <div className="absolute top-12 sm:top-16 md:top-20 right-2 sm:right-4 z-20 pointer-events-auto select-none">
-          {isLeaderboardCollapsed ? (
-            /* Micro Collapsed Pill */
-            <button
-              type="button"
-              onClick={() => setIsLeaderboardCollapsed(false)}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full border border-white/10 text-white shadow-lg transition-all active:scale-95 text-[9px] sm:text-xs font-mono"
-              title="Expandir clasificación"
-            >
-              <Trophy size={11} className="text-yellow-400 shrink-0" />
-              <span className="truncate max-w-[70px] sm:max-w-[100px] text-amber-300 font-bold">
-                🥇 {gameState.leaderboard[0]?.name}
-              </span>
-              <span className="text-yellow-400 font-extrabold">{Math.floor(gameState.leaderboard[0]?.score || 0)}</span>
-              <ChevronDown size={11} className="text-white/40 ml-0.5" />
-            </button>
-          ) : (
-            /* Compact Expanded Card */
-            <div className="w-32 sm:w-48 md:w-56 lg:w-60 bg-black/60 sm:bg-black/70 backdrop-blur-md rounded-xl sm:rounded-2xl p-1.5 sm:p-3 md:p-3.5 border border-white/10 shadow-2xl transition-all">
-              <button
-                type="button"
-                onClick={() => setIsLeaderboardCollapsed(true)}
-                className="w-full flex items-center justify-between gap-1 mb-1 sm:mb-2 text-white/90 font-semibold cursor-pointer group"
-                title="Minimizar clasificación"
-              >
-                <div className="flex items-center gap-1">
-                  <Trophy size={12} className="text-yellow-400 shrink-0 sm:w-3.5 sm:h-3.5" />
-                  <h2 className="tracking-wider text-[8px] sm:text-xs font-bold uppercase font-mono">
-                    <span className="sm:hidden">TOP 3</span>
-                    <span className="hidden sm:inline">TOP REPARTIDORES</span>
-                  </h2>
-                </div>
-                <ChevronDown size={11} className="text-white/40 group-hover:text-white transition-transform rotate-180" />
-              </button>
+        <div className="absolute top-12 sm:top-16 md:top-20 right-2 sm:right-4 w-36 sm:w-48 md:w-56 lg:w-60 bg-black/55 sm:bg-black/70 backdrop-blur-md rounded-xl sm:rounded-2xl p-2 sm:p-3 md:p-3.5 border border-white/10 pointer-events-auto shadow-2xl transition-all select-none z-20">
+          <div className="flex items-center gap-1.5 mb-1 sm:mb-2 text-white/90 font-semibold">
+            <Trophy size={13} className="text-yellow-400 shrink-0 sm:w-4 sm:h-4" />
+            <h2 className="tracking-wider text-[9px] sm:text-xs font-bold uppercase font-mono">
+              <span className="sm:hidden">TOP 3</span>
+              <span className="hidden sm:inline">TOP REPARTIDORES</span>
+            </h2>
+          </div>
 
-              <div className="flex flex-col gap-0.5 sm:gap-1.5">
-                {gameState.leaderboard.map((entry, i) => {
-                  const isMe = entry.id === playerId;
-                  return (
-                    <div
-                      key={entry.id}
-                      className={`flex justify-between items-center text-[9px] sm:text-xs font-mono py-0.5 rounded px-1 transition-colors ${
-                        i >= 3 ? 'hidden sm:flex' : 'flex'
-                      } ${isMe ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-white/80'}`}
+          <div className="flex flex-col gap-0.5 sm:gap-1.5">
+            {gameState.leaderboard.map((entry, i) => {
+              const isMe = entry.id === playerId;
+              return (
+                <div
+                  key={entry.id}
+                  className={`flex justify-between items-center text-[10px] sm:text-xs font-mono py-0.5 rounded px-1 transition-colors ${
+                    i >= 3 ? 'hidden sm:flex' : 'flex'
+                  } ${isMe ? 'bg-amber-500/25 text-amber-300 font-bold' : 'text-white/80'}`}
+                >
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className={`w-3.5 sm:w-4 font-mono text-[9px] sm:text-[10px] shrink-0 ${
+                      i === 0 ? 'text-amber-400 font-black' : i === 1 ? 'text-neutral-300' : i === 2 ? 'text-amber-600' : 'text-white/30'
+                    }`}>
+                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
+                    </span>
+                    <span
+                      style={{ color: isMe ? undefined : entry.color }}
+                      className="truncate max-w-[62px] sm:max-w-[95px] md:max-w-[120px] font-bold"
                     >
-                      <div className="flex items-center gap-1 truncate">
-                        <span className={`w-3 sm:w-4 font-mono text-[8px] sm:text-[10px] shrink-0 ${
-                          i === 0 ? 'text-amber-400 font-black' : i === 1 ? 'text-neutral-300' : i === 2 ? 'text-amber-600' : 'text-white/30'
-                        }`}>
-                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
-                        </span>
-                        <span
-                          style={{ color: isMe ? undefined : entry.color }}
-                          className="truncate max-w-[50px] sm:max-w-[95px] md:max-w-[120px] font-bold"
-                        >
-                          {entry.name}
-                        </span>
-                      </div>
-                      <span className="font-mono text-yellow-400 font-bold ml-1 shrink-0">{Math.floor(entry.score)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                      {entry.name}
+                    </span>
+                  </div>
+                  <span className="font-mono text-yellow-400 font-bold ml-1 shrink-0">{Math.floor(entry.score)}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

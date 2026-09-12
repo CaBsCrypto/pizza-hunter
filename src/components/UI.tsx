@@ -427,6 +427,7 @@ export function UI() {
 
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [isMutedState, setIsMutedState] = useState<boolean>(() => getIsMuted());
+  const [isLeaderboardCollapsed, setIsLeaderboardCollapsed] = useState<boolean>(false);
   const [showTimeExpiredScreen, setShowTimeExpiredScreen] = useState(false);
   const lastPlayedSecond = useRef<number | null>(null);
   const wasRoundOver = useRef<boolean>(false);
@@ -872,26 +873,62 @@ export function UI() {
         </div>
       </div>
 
-      {/* Leaderboard */}
+      {/* In-Game Live Leaderboard */}
       {isAlive && gameState && gameState.leaderboard.length > 0 && (
-        <div className="absolute top-20 right-4 w-64 bg-black/60 backdrop-blur-md rounded-2xl p-4 border border-white/10 pointer-events-auto shadow-2xl">
-          <div className="flex items-center gap-2 mb-3 text-white/90 font-semibold">
-            <Trophy size={18} className="text-yellow-400" />
-            <h2 className="tracking-wider text-xs font-bold uppercase font-mono">TOP REPARTIDORES</h2>
-          </div>
-          <div className="flex flex-col gap-2">
-            {gameState.leaderboard.map((entry, i) => (
-              <div key={entry.id} className="flex justify-between items-center text-sm">
-                <div className="flex items-center gap-2 truncate">
-                  <span className="text-white/40 w-4 font-mono text-xs">{i + 1}.</span>
-                  <span style={{ color: entry.color }} className="font-semibold truncate max-w-[120px]">
-                    {entry.name}
-                  </span>
-                </div>
-                <span className="font-mono text-yellow-400 font-bold">{entry.score}</span>
-              </div>
-            ))}
-          </div>
+        <div className="absolute top-14 sm:top-16 md:top-20 right-2 sm:right-4 w-36 sm:w-48 md:w-56 lg:w-60 bg-black/50 sm:bg-black/60 backdrop-blur-md rounded-xl sm:rounded-2xl p-2 sm:p-3 md:p-3.5 border border-white/10 pointer-events-auto shadow-2xl transition-all select-none z-20">
+          <button
+            type="button"
+            onClick={() => setIsLeaderboardCollapsed(!isLeaderboardCollapsed)}
+            className="w-full flex items-center justify-between gap-1 mb-1 sm:mb-2 text-white/90 font-semibold cursor-pointer group"
+            title="Mostrar / Ocultar clasificación"
+          >
+            <div className="flex items-center gap-1.5">
+              <Trophy size={14} className="text-yellow-400 shrink-0 sm:w-4 sm:h-4" />
+              <h2 className="tracking-wider text-[9px] sm:text-xs font-bold uppercase font-mono">
+                <span className="sm:hidden">TOP 3</span>
+                <span className="hidden sm:inline">TOP REPARTIDORES</span>
+              </h2>
+            </div>
+            <ChevronDown size={13} className={`text-white/40 group-hover:text-white transition-transform sm:hidden ${isLeaderboardCollapsed ? '-rotate-90' : ''}`} />
+          </button>
+
+          {!isLeaderboardCollapsed ? (
+            <div className="flex flex-col gap-1 sm:gap-1.5">
+              {gameState.leaderboard.map((entry, i) => {
+                const isMe = entry.id === playerId;
+                return (
+                  <div
+                    key={entry.id}
+                    className={`flex justify-between items-center text-[10px] sm:text-xs font-mono py-0.5 rounded px-1 transition-colors ${
+                      i >= 3 ? 'hidden sm:flex' : 'flex'
+                    } ${isMe ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-white/80'}`}
+                  >
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className={`w-3.5 sm:w-4 font-mono text-[9px] sm:text-[10px] shrink-0 ${
+                        i === 0 ? 'text-amber-400 font-black' : i === 1 ? 'text-neutral-300' : i === 2 ? 'text-amber-600' : 'text-white/30'
+                      }`}>
+                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
+                      </span>
+                      <span
+                        style={{ color: isMe ? undefined : entry.color }}
+                        className="truncate max-w-[60px] sm:max-w-[95px] md:max-w-[120px] font-bold"
+                      >
+                        {entry.name}
+                      </span>
+                    </div>
+                    <span className="font-mono text-yellow-400 font-bold ml-1 shrink-0">{Math.floor(entry.score)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between text-[9px] font-mono text-white/60 py-0.5 sm:hidden">
+              <span className="truncate max-w-[75px] text-amber-400 font-bold">
+                🥇 {gameState.leaderboard[0]?.name}
+              </span>
+              <span className="text-yellow-400 font-black">{Math.floor(gameState.leaderboard[0]?.score || 0)}</span>
+            </div>
+          )}
         </div>
       )}
 

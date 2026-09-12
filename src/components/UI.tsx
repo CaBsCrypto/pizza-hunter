@@ -427,7 +427,12 @@ export function UI() {
 
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [isMutedState, setIsMutedState] = useState<boolean>(() => getIsMuted());
-  const [isLeaderboardCollapsed, setIsLeaderboardCollapsed] = useState<boolean>(false);
+  const [isLeaderboardCollapsed, setIsLeaderboardCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
   const [showTimeExpiredScreen, setShowTimeExpiredScreen] = useState(false);
   const lastPlayedSecond = useRef<number | null>(null);
   const wasRoundOver = useRef<boolean>(false);
@@ -796,13 +801,13 @@ export function UI() {
 
       {/* Top Bar */}
       <div className="flex justify-between items-start pointer-events-auto relative">
-        <div className="flex flex-col gap-1 z-10">
-          <h1 className="text-3xl font-black text-amber-500 tracking-tighter" style={{ textShadow: '0 0 15px rgba(235,94,40,0.6)' }}>
+        <div className="flex flex-col gap-0.5 sm:gap-1 z-10">
+          <h1 className="text-xl sm:text-3xl font-black text-amber-500 tracking-tighter" style={{ textShadow: '0 0 15px rgba(235,94,40,0.6)' }}>
             PIZZA HUNTER
           </h1>
           {isAlive && (
-            <div className="text-lg font-mono text-white/95 font-bold bg-black/40 px-3 py-1 rounded-full border border-white/5 w-fit">
-              🍕 Cajas Apiladas: <span className="text-yellow-400 font-extrabold">{currentScore}</span>
+            <div className="text-xs sm:text-base font-mono text-white/95 font-bold bg-black/40 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border border-white/5 w-fit">
+              🍕 Cajas: <span className="text-yellow-400 font-extrabold">{currentScore}</span>
             </div>
           )}
         </div>
@@ -840,33 +845,33 @@ export function UI() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 z-10">
+        <div className="flex items-center gap-1.5 sm:gap-2 z-10">
           <button
             onClick={() => {
               const muted = toggleMuteAudio();
               setIsMutedState(muted);
             }}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white text-xs font-bold transition-all shadow-lg active:scale-95 border border-white/5"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white text-xs font-bold transition-all shadow-lg active:scale-95 border border-white/5"
             title={isMutedState ? "Activar Sonido" : "Silenciar Sonido"}
           >
-            {isMutedState ? <VolumeX size={15} className="text-red-400" /> : <Volume2 size={15} className="text-amber-400" />}
+            {isMutedState ? <VolumeX size={14} className="text-red-400" /> : <Volume2 size={14} className="text-amber-400" />}
             <span className="hidden sm:inline text-xs font-mono">{isMutedState ? "MUTE" : "AUDIO"}</span>
           </button>
 
           <button
             onClick={handleOpenNewTab}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white text-sm font-bold transition-colors shadow-lg"
+            className="flex items-center gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white text-xs sm:text-sm font-bold transition-colors shadow-lg"
           >
-            <ExternalLink size={16} />
-            <span>Nueva Pestaña</span>
+            <ExternalLink size={14} />
+            <span className="hidden sm:inline">Nueva Pestaña</span>
           </button>
 
           {isAlive && (
             <button
               onClick={quitGame}
-              className="flex items-center gap-1.5 px-4 py-2 bg-red-600/90 hover:bg-red-500 backdrop-blur-md rounded-full text-white text-sm font-bold transition-colors shadow-lg active:scale-95"
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-red-600/90 hover:bg-red-500 backdrop-blur-md rounded-full text-white text-xs sm:text-sm font-bold transition-colors shadow-lg active:scale-95"
             >
-              <LogOut size={15} />
+              <LogOut size={14} />
               <span>Salir</span>
             </button>
           )}
@@ -875,58 +880,69 @@ export function UI() {
 
       {/* In-Game Live Leaderboard */}
       {isAlive && gameState && gameState.leaderboard.length > 0 && (
-        <div className="absolute top-14 sm:top-16 md:top-20 right-2 sm:right-4 w-36 sm:w-48 md:w-56 lg:w-60 bg-black/50 sm:bg-black/60 backdrop-blur-md rounded-xl sm:rounded-2xl p-2 sm:p-3 md:p-3.5 border border-white/10 pointer-events-auto shadow-2xl transition-all select-none z-20">
-          <button
-            type="button"
-            onClick={() => setIsLeaderboardCollapsed(!isLeaderboardCollapsed)}
-            className="w-full flex items-center justify-between gap-1 mb-1 sm:mb-2 text-white/90 font-semibold cursor-pointer group"
-            title="Mostrar / Ocultar clasificación"
-          >
-            <div className="flex items-center gap-1.5">
-              <Trophy size={14} className="text-yellow-400 shrink-0 sm:w-4 sm:h-4" />
-              <h2 className="tracking-wider text-[9px] sm:text-xs font-bold uppercase font-mono">
-                <span className="sm:hidden">TOP 3</span>
-                <span className="hidden sm:inline">TOP REPARTIDORES</span>
-              </h2>
-            </div>
-            <ChevronDown size={13} className={`text-white/40 group-hover:text-white transition-transform sm:hidden ${isLeaderboardCollapsed ? '-rotate-90' : ''}`} />
-          </button>
-
-          {!isLeaderboardCollapsed ? (
-            <div className="flex flex-col gap-1 sm:gap-1.5">
-              {gameState.leaderboard.map((entry, i) => {
-                const isMe = entry.id === playerId;
-                return (
-                  <div
-                    key={entry.id}
-                    className={`flex justify-between items-center text-[10px] sm:text-xs font-mono py-0.5 rounded px-1 transition-colors ${
-                      i >= 3 ? 'hidden sm:flex' : 'flex'
-                    } ${isMe ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-white/80'}`}
-                  >
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className={`w-3.5 sm:w-4 font-mono text-[9px] sm:text-[10px] shrink-0 ${
-                        i === 0 ? 'text-amber-400 font-black' : i === 1 ? 'text-neutral-300' : i === 2 ? 'text-amber-600' : 'text-white/30'
-                      }`}>
-                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
-                      </span>
-                      <span
-                        style={{ color: isMe ? undefined : entry.color }}
-                        className="truncate max-w-[60px] sm:max-w-[95px] md:max-w-[120px] font-bold"
-                      >
-                        {entry.name}
-                      </span>
-                    </div>
-                    <span className="font-mono text-yellow-400 font-bold ml-1 shrink-0">{Math.floor(entry.score)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex items-center justify-between text-[9px] font-mono text-white/60 py-0.5 sm:hidden">
-              <span className="truncate max-w-[75px] text-amber-400 font-bold">
+        <div className="absolute top-12 sm:top-16 md:top-20 right-2 sm:right-4 z-20 pointer-events-auto select-none">
+          {isLeaderboardCollapsed ? (
+            /* Micro Collapsed Pill */
+            <button
+              type="button"
+              onClick={() => setIsLeaderboardCollapsed(false)}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-black/60 hover:bg-black/80 backdrop-blur-md rounded-full border border-white/10 text-white shadow-lg transition-all active:scale-95 text-[9px] sm:text-xs font-mono"
+              title="Expandir clasificación"
+            >
+              <Trophy size={11} className="text-yellow-400 shrink-0" />
+              <span className="truncate max-w-[70px] sm:max-w-[100px] text-amber-300 font-bold">
                 🥇 {gameState.leaderboard[0]?.name}
               </span>
-              <span className="text-yellow-400 font-black">{Math.floor(gameState.leaderboard[0]?.score || 0)}</span>
+              <span className="text-yellow-400 font-extrabold">{Math.floor(gameState.leaderboard[0]?.score || 0)}</span>
+              <ChevronDown size={11} className="text-white/40 ml-0.5" />
+            </button>
+          ) : (
+            /* Compact Expanded Card */
+            <div className="w-32 sm:w-48 md:w-56 lg:w-60 bg-black/60 sm:bg-black/70 backdrop-blur-md rounded-xl sm:rounded-2xl p-1.5 sm:p-3 md:p-3.5 border border-white/10 shadow-2xl transition-all">
+              <button
+                type="button"
+                onClick={() => setIsLeaderboardCollapsed(true)}
+                className="w-full flex items-center justify-between gap-1 mb-1 sm:mb-2 text-white/90 font-semibold cursor-pointer group"
+                title="Minimizar clasificación"
+              >
+                <div className="flex items-center gap-1">
+                  <Trophy size={12} className="text-yellow-400 shrink-0 sm:w-3.5 sm:h-3.5" />
+                  <h2 className="tracking-wider text-[8px] sm:text-xs font-bold uppercase font-mono">
+                    <span className="sm:hidden">TOP 3</span>
+                    <span className="hidden sm:inline">TOP REPARTIDORES</span>
+                  </h2>
+                </div>
+                <ChevronDown size={11} className="text-white/40 group-hover:text-white transition-transform rotate-180" />
+              </button>
+
+              <div className="flex flex-col gap-0.5 sm:gap-1.5">
+                {gameState.leaderboard.map((entry, i) => {
+                  const isMe = entry.id === playerId;
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`flex justify-between items-center text-[9px] sm:text-xs font-mono py-0.5 rounded px-1 transition-colors ${
+                        i >= 3 ? 'hidden sm:flex' : 'flex'
+                      } ${isMe ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-white/80'}`}
+                    >
+                      <div className="flex items-center gap-1 truncate">
+                        <span className={`w-3 sm:w-4 font-mono text-[8px] sm:text-[10px] shrink-0 ${
+                          i === 0 ? 'text-amber-400 font-black' : i === 1 ? 'text-neutral-300' : i === 2 ? 'text-amber-600' : 'text-white/30'
+                        }`}>
+                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
+                        </span>
+                        <span
+                          style={{ color: isMe ? undefined : entry.color }}
+                          className="truncate max-w-[50px] sm:max-w-[95px] md:max-w-[120px] font-bold"
+                        >
+                          {entry.name}
+                        </span>
+                      </div>
+                      <span className="font-mono text-yellow-400 font-bold ml-1 shrink-0">{Math.floor(entry.score)}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
